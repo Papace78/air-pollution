@@ -1,12 +1,14 @@
 """Handles data transformations and returns dataframes suited for db loading."""
 
+import time
+
 import pandas as pd
 from tqdm import tqdm
 
 from extract import api_call
 
 
-def transform(extracted_data: dict) -> dict[pd.DataFrame]:
+def transform_data(extracted_data: dict) -> dict[pd.DataFrame]:
     countries_df = transform_countries(extracted_data["countries"])
     pollutants_df = transform_pollutants(extracted_data["pollutants"])
     locations_df = transform_locations(extracted_data["locations"])
@@ -49,10 +51,12 @@ def transform_locations(locations_json: dict) -> pd.DataFrame:
         "distance",
     ]
     df.drop(columns=drop_cols, inplace=True)
+    df["name"] = df["name"].str.lower()
+    df["locality"] = df["locality"].str.lower()
 
     df["country_id"] = df["country"].map(lambda s: s["id"])
-    df["latitude"] = df["coordinates"].map(lambda s: s["latitude"])
-    df["longitude"] = df["coordinates"].map(lambda s: s["longitude"])
+    df["latitude"] = df["coordinates"].map(lambda s: round(s["latitude"], 3))
+    df["longitude"] = df["coordinates"].map(lambda s: round(s["longitude"], 3))
     df.drop(columns=["country", "coordinates"], inplace=True)
 
     df["datetimeFirst"] = df["datetimeFirst"].map(lambda s: s["utc"])
@@ -62,6 +66,20 @@ def transform_locations(locations_json: dict) -> pd.DataFrame:
     )
 
     df["active"] = df["datetimeLast"] >= (pd.Timestamp.utcnow() - pd.Timedelta(days=1))
+    df = df[
+        [
+            "id",
+            "name",
+            "locality",
+            "datetimeFirst",
+            "datetimeLast",
+            "country_id",
+            "latitude",
+            "longitude",
+            "active",
+            "sensors",
+        ]
+    ]
 
     return df.reset_index(drop=True)
 
@@ -82,6 +100,7 @@ def transform_sensors(locations_df: pd.DataFrame) -> pd.DataFrame:
 
     return sensors_df.reset_index(drop=True)
 
+
 def transform_measurements(sensors_df: pd.DataFrame) -> pd.DataFrame:
     """Transforms sensor measurement data from API responses.
 
@@ -93,7 +112,34 @@ def transform_measurements(sensors_df: pd.DataFrame) -> pd.DataFrame:
     """
     measurements_list = []
 
-    for sensor_id in tqdm(sensors_df["id"].iloc[:10], desc="Processing Sensors", unit="sensor"):
+
+    minute_requests = 0
+    hour_requests = 0
+    last_minute_timestamp = time.time()
+    last_hour_timestamp = time.time()
+
+
+    for sensor_id in tqdm(
+        sensors_df["id"].iloc[:100], desc="Processing Sensors", unit="sensor"
+    ):
+        # Check minute limit
+        if minute_requests >= 59:
+            time_to_wait = 60
+            if time_to_wait > 0:
+                print(f"Rate limit reached for minute. Waiting for {time_to_wait:.2f} seconds...")
+                time.sleep(time_to_wait)  # Wait for the remaining time in the minute
+            # Reset minute counter and timestamp
+            minute_requests = 0
+
+        # Check hourly limit
+        if hour_requests >= 1999:
+            time_to_wait = 3600 - (time.time() - last_hour_timestamp)  # Wait for the remaining time in the hour
+            if time_to_wait > 0:
+                print(f"Rate limit reached for hour. Waiting for {time_to_wait:.2f} seconds...")
+                time.sleep(time_to_wait)  # Wait for the remaining time in the hour
+            hour_requests = 0
+            last_hour_timestamp = time.time()
+
         measurements_json = api_call(f"sensors/{sensor_id}/years", {"limit": 1000})
         measurements_df = pd.DataFrame(measurements_json.get("results", []))
 
@@ -108,7 +154,7 @@ def transform_measurements(sensors_df: pd.DataFrame) -> pd.DataFrame:
         measurements_df["datetimeTo"] = pd.to_datetime(
             measurements_df["period"].str["datetimeTo"].str["utc"]
         )
-        summary_df = pd.json_normalize(measurements_df["summary"])
+        summary_df = pd.json_normalize(measurements_df["summary"]).round(2)
         measurements_df.drop(columns=["period", "summary"], inplace=True)
 
         drop_cols = ["flagInfo", "parameter", "coordinates", "coverage"]
@@ -116,8 +162,34 @@ def transform_measurements(sensors_df: pd.DataFrame) -> pd.DataFrame:
 
         measurements_list.append(pd.concat([measurements_df, summary_df], axis=1))
 
-    return (
-        pd.concat(measurements_list, ignore_index=True)
-        if measurements_list
-        else pd.DataFrame()
+        minute_requests += 1
+        hour_requests += 1
+
+    measurements_df = (
+        (
+            pd.concat(measurements_list, ignore_index=True)
+            if measurements_list
+            else pd.DataFrame()
+        )
+        .reset_index(drop=False)
+        .rename(columns={"index": "id"})
     )
+
+    return measurements_df[
+        [
+            "id",
+            "sensor_id",
+            "datetimeFrom",
+            "datetimeTo",
+            "value",
+            "min",
+            "q02",
+            "q25",
+            "median",
+            "q75",
+            "q98",
+            "max",
+            "avg",
+            "sd",
+        ]
+    ]

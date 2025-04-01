@@ -32,7 +32,7 @@ def api_call(endpoint: str, params: dict = None) -> dict:
         raise ValueError(f"Request failed with status code: {response.status_code}")
 
 
-def extract() -> dict:
+def extract_data() -> dict:
     """Extracts data from OpenAQ API for France (ID: 22).
 
     Measurements can only be extracted once locations data is transformed.
