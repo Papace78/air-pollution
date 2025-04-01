@@ -115,7 +115,6 @@ def transform_measurements(sensors_df: pd.DataFrame) -> pd.DataFrame:
 
     minute_requests = 0
     hour_requests = 0
-    last_minute_timestamp = time.time()
     last_hour_timestamp = time.time()
 
 
