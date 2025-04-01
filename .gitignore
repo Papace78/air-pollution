@@ -11,3 +11,6 @@ wheels/
 
 # Notebooks
 notebooks/
+
+# Secret
+.env
