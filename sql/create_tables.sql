@@ -1,0 +1,46 @@
+CREATE TABLE countries (
+    id BIGSERIAL NOT NULL PRIMARY KEY,
+    code VARCHAR(10) NOT NULL,
+    name VARCHAR(60) NOT NULL
+);
+
+CREATE TABLE pollutants (
+    id BIGSERIAL NOT NULL PRIMARY KEY,
+    name VARCHAR(60) NOT NULL,
+    unit VARCHAR(60) NOT NULL
+);
+
+CREATE TABLE locations (
+    id BIGSERIAL NOT NULL PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+locality VARCHAR(150) NOT NULL,
+    datetimeFirst TIMESTAMP NOT NULL,
+    datetimeLast TIMESTAMP NOT NULL,
+    country_id BIGINT REFERENCES countries(id),
+    latitude REAL NOT NULL,
+    longitude REAL NOT NULL,
+    active BOOLEAN NOT NULL
+);
+
+CREATE TABLE sensors (
+id BIGSERIAL NOT NULL PRIMARY KEY,
+location_id BIGINT REFERENCES locations(id),
+pollutant_id BIGINT REFERENCES pollutants(id)
+) ;
+
+CREATE TABLE measurements (
+id BIGSERIAL NOT NULL PRIMARY KEY,
+sensor_id BIGINT REFERENCES sensors(id),
+datetimeFrom TIMESTAMP NOT NULL,
+datetimeTo TIMESTAMP NOT NULL,
+value REAL NOT NULL,
+min REAL NOT NULL,
+q02 REAL NOT NULL,
+q25 REAL NOT NULL,
+median REAL NOT NULL,
+q75 REAL NOT NULL,
+q98 REAL NOT NULL,
+max REAL NOT NULL,
+avg REAL NOT NULL,
+sd REAL NOT NULL
+);
