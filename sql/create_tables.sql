@@ -7,7 +7,7 @@ CREATE TABLE countries (
 CREATE TABLE pollutants (
     id BIGSERIAL NOT NULL PRIMARY KEY,
     name VARCHAR(60) NOT NULL,
-    unit VARCHAR(60) NOT NULL
+    units VARCHAR(60) NOT NULL
 );
 
 CREATE TABLE locations (
