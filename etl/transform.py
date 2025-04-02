@@ -112,34 +112,27 @@ def transform_measurements(sensors_df: pd.DataFrame) -> pd.DataFrame:
     """
     measurements_list = []
 
-
     minute_requests = 0
     hour_requests = 0
-    last_hour_timestamp = time.time()
 
+    for sensor_id in tqdm(sensors_df["id"], desc="Processing Sensors", unit="sensor"):
+        if hour_requests >= 1500:
+            print(
+                f"Hourly rate limit reached. Waiting 1hr starting {time.strftime("%H:%M:%S", time.localtime())}..."
+            )
+            time.sleep(3600)
+            hour_requests = 0
 
-    for sensor_id in tqdm(
-        sensors_df["id"].iloc[:100], desc="Processing Sensors", unit="sensor"
-    ):
-        # Check minute limit
-        if minute_requests >= 59:
-            time_to_wait = 60
-            if time_to_wait > 0:
-                print(f"Rate limit reached for minute. Waiting for {time_to_wait:.2f} seconds...")
-                time.sleep(time_to_wait)  # Wait for the remaining time in the minute
-            # Reset minute counter and timestamp
+        if minute_requests >= 50:
+            print(
+                f"Minute rate limit reached. Waiting 1min starting {time.strftime("%H:%M:%S", time.localtime())}..."
+            )
+            time.sleep(60)
             minute_requests = 0
 
-        # Check hourly limit
-        if hour_requests >= 1999:
-            time_to_wait = 3600 - (time.time() - last_hour_timestamp)  # Wait for the remaining time in the hour
-            if time_to_wait > 0:
-                print(f"Rate limit reached for hour. Waiting for {time_to_wait:.2f} seconds...")
-                time.sleep(time_to_wait)  # Wait for the remaining time in the hour
-            hour_requests = 0
-            last_hour_timestamp = time.time()
-
-        measurements_json = api_call(f"sensors/{sensor_id}/years", {"limit": 1000})
+        measurements_json = api_call(
+            f"sensors/{sensor_id}/days/monthly", {"limit": 1000}
+        )
         measurements_df = pd.DataFrame(measurements_json.get("results", []))
 
         if measurements_df.empty:
