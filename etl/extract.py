@@ -2,6 +2,7 @@
 
 import os
 
+from tenacity import retry, stop_after_attempt, wait_random_exponential
 from dotenv import load_dotenv
 import httpx
 
@@ -11,7 +12,11 @@ API_KEY = os.getenv("OPENAQ_API_KEY")
 BASE_URL = "https://api.openaq.org/v3/"
 HEADERS = {"X-API-Key": API_KEY}
 
-
+@retry(
+    reraise=True,
+    wait=wait_random_exponential(min=0.1, max=10),
+    stop=stop_after_attempt(10),
+)
 def api_call(endpoint: str, params: dict = None) -> dict:
     """Makes an API request to OpenAQ.
 
