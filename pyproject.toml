@@ -16,4 +16,6 @@ dependencies = [
     "psycopg-binary>=3.2.6",
     "psycopg-pool>=3.2.6",
     "tenacity>=9.0.0",
+    "sqlalchemy>=2.0.40",
+    "geopy>=2.4.1",
 ]
