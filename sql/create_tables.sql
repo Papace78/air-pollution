@@ -19,7 +19,11 @@ locality VARCHAR(150) NOT NULL,
     country_id BIGINT REFERENCES countries(id),
     latitude REAL NOT NULL,
     longitude REAL NOT NULL,
-    active BOOLEAN NOT NULL
+    active BOOLEAN NOT NULL,
+    town VARCHAR(150) NOT NULL,
+    department VARCHAR(150) NOT NULL,
+    region VARCHAR(150) NOT NULL,
+    postcode BIGINT NOT NULL,
 );
 
 CREATE TABLE sensors (
