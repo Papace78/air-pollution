@@ -4,14 +4,17 @@ import time
 
 import pandas as pd
 from tqdm import tqdm
-
+from geopy.geocoders import Nominatim
 from extract import api_call
+
+geolocator = Nominatim(user_agent="air-pollution")
 
 
 def transform_data(extracted_data: dict) -> dict[pd.DataFrame]:
     countries_df = transform_countries(extracted_data["countries"])
     pollutants_df = transform_pollutants(extracted_data["pollutants"])
     locations_df = transform_locations(extracted_data["locations"])
+    locations_df = add_regional_information(locations_df)
     sensors_df = transform_sensors(locations_df)
     measurements_df = transform_measurements(sensors_df)
 
@@ -53,7 +56,7 @@ def transform_locations(locations_json: dict) -> pd.DataFrame:
     df.drop(columns=drop_cols, inplace=True)
     df["name"] = df["name"].str.lower()
     df["locality"] = df["locality"].str.lower()
-    df['locality'] = df['locality'].fillna('not_provided')
+    df["locality"] = df["locality"].fillna("not_provided")
 
     df["country_id"] = df["country"].map(lambda s: s["id"])
     df["latitude"] = df["coordinates"].map(lambda s: round(s["latitude"], 3))
@@ -186,3 +189,70 @@ def transform_measurements(sensors_df: pd.DataFrame) -> pd.DataFrame:
             "sd",
         ]
     ]
+
+def get_city_and_region(latitude, longitude):
+    """
+    Retrieve the city, department, region, and postcode based on geographic coordinates.
+
+    Parameters:
+        latitude (float): Latitude coordinate of the location.
+        longitude (float): Longitude coordinate of the location.
+
+    Returns:
+        tuple: A tuple containing the city, department, region, and postcode.
+
+    Exceptions:
+        If the geocoding request fails, None values are returned for all location attributes.
+
+    Example:
+        get_city_and_region(44.143, 4.139) -> ('Paris', 'Île-de-France', 'Île-de-France', '75000')
+    """
+    try:
+        location = geolocator.reverse((latitude, longitude))
+        if location:
+            address = location.raw.get("address", {})
+            town = address.get(
+                "municipality", address.get("city_district", "Not_found")
+            )
+            department = address.get("county", address.get("city", "Not_found"))
+            region = address.get("state", address.get("Île-de-france", "Not_found"))
+            postcode = address.get("postcode", "00000")
+            return town, department, region, postcode
+    except Exception as e:
+        print(f"Erreur lors du géocodage : {e}")
+    return None, None, None
+
+
+def add_regional_information(locations_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add regional information (town, department, region, postcode) to a DataFrame based on geographic coordinates.
+
+    Parameters:
+        locations_df (pd.DataFrame): DataFrame containing columns 'latitude' and 'longitude' representing
+                                     geographic coordinates.
+
+    Returns:
+        pd.DataFrame: The input DataFrame with additional columns for 'town', 'department', 'region', and 'postcode',
+                      populated with the corresponding location information retrieved via reverse geocoding.
+    """
+    towns = []
+    departments = []
+    regions = []
+    postcodes = []
+
+    for index, row in locations_df.iterrows():
+        town, department, region, postcode = get_city_and_region(
+            row["latitude"], row["longitude"]
+        )
+        towns.append(town)
+        departments.append(department)
+        regions.append(region)
+        postcodes.append(postcode)
+        time.sleep(1)
+
+    locations_df.loc[:, "town"] = towns
+    locations_df.loc[:, "department"] = departments
+    locations_df.loc[:, "region"] = regions
+    locations_df.loc[:, "postcode"] = postcodes
+    locations_df["postcode"] = locations_df["postcode"].astype(int)
+    return locations_df
