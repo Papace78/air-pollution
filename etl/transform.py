@@ -53,6 +53,7 @@ def transform_locations(locations_json: dict) -> pd.DataFrame:
     df.drop(columns=drop_cols, inplace=True)
     df["name"] = df["name"].str.lower()
     df["locality"] = df["locality"].str.lower()
+    df['locality'] = df['locality'].fillna('not_provided')
 
     df["country_id"] = df["country"].map(lambda s: s["id"])
     df["latitude"] = df["coordinates"].map(lambda s: round(s["latitude"], 3))
