@@ -18,4 +18,6 @@ dependencies = [
     "tenacity>=9.0.0",
     "sqlalchemy>=2.0.40",
     "geopy>=2.4.1",
+    "streamlit>=1.44.1",
+    "supabase>=2.15.0",
 ]
