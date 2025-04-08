@@ -4,13 +4,11 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-from datetime import datetime
-
-import folium
-from folium.plugins import HeatMap
 
 from sidebar import create_sidebar
 from data_generation import get_all_measures,get_all_filtered_data
+from plots import generate_heatmap, bar_plot_ranking_sensors, bar_plot_average_concentrations
+from data_transformation import rank_by_number_of_sensors, rank_by_average_concentration
 
 
 pollutant_list = ["co", "o3", "no", "no2", "pm10", "pm25", "so2"]
@@ -26,14 +24,14 @@ all_measures = get_all_measures()
     df_final,
 ) = create_sidebar(all_measures)
 location_options = sorted(all_measures[location_filter_by].dropna().unique())
-
-st.markdown(f"### Data for {selected_location} and {selected_pollutant}")
-
-# --------------------------------------------------------------------------------
 start_date_str = start_date.strftime("%Y-%m-%d")
 end_date_str = end_date.strftime("%Y-%m-%d")
 
-# Usage:
+# --------------------------------------------------------------------------------
+
+st.markdown(f"### Data for {selected_location} and {selected_pollutant}")
+
+
 data = get_all_filtered_data(selected_pollutant, start_date_str, end_date_str)
 
 reduction_data = data["reduction_data"]
@@ -41,229 +39,6 @@ measurements_data = data["measurements_data"]
 heat_data = data["heat_data"]
 seasons_data = data["seasons_data"]
 weekly_data = data["weekly_data"]
-
-
-def generate_heatmap(heat_measures: pd.DataFrame):
-    heat_data = heat_measures[["latitude", "longitude", "average"]].values.tolist()
-    france_coordinates = [46.5, 2.2]
-    # Create a folium map with a custom tile layer
-    m = folium.Map(location=france_coordinates, zoom_start=6)
-
-    # Define the heatmap gradient for better visualization
-    gradient = {
-        "0.2": "blue",
-        "0.4": "lime",
-        "0.6": "yellow",
-        "0.8": "orange",
-        "1": "red",
-    }
-
-    # Add HeatMap with smoother transitions
-    HeatMap(heat_data, radius=25, blur=35, max_zoom=15, gradient=gradient).add_to(m)
-
-    # Add custom tooltips without any markers/icons
-    for i, row in heat_measures.iterrows():
-        tooltip = f"""
-        <b>Ville:</b> {row['town']}<br>
-        <b>Polluant:</b> {row['pollutant']}<br>
-        <b>Valeur Moyenne:</b> {row['average']} {row['units']}<br>
-        <i>Hover to explore</i>
-        """
-
-        folium.CircleMarker(
-            location=[row["latitude"], row["longitude"]],
-            radius=10,
-            color=None,
-            fill=True,
-            fill_opacity=0,
-            tooltip=tooltip,
-        ).add_to(m)
-
-    st.components.v1.html(
-        f"""
-        <div style="height:100%; width:100%;">
-            <style>
-                .folium-map {{
-                    height: 100%;
-                    width: 100%;
-                    border-radius: 10px;
-                    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-                }}
-                #map {{
-                    height: 100vh;
-                }}
-            </style>
-            {m.get_root().render()}
-        </div>
-        """,
-        height=700,  # You can adjust this if needed
-        scrolling=False,
-    )
-
-
-def generate_ranking_sensors(measures: pd.DataFrame):
-    sensors_per_location_filter = (
-        measures[measures["pollutant_name"] == selected_pollutant]
-        .groupby([location_filter_by, "pollutant_name"])["sensor_id"]
-        .nunique()
-        .reset_index()
-    )
-
-    sensors_per_location_filter = sensors_per_location_filter.sort_values(
-        by="sensor_id"
-    )
-
-    sensors_per_location_filter["x_key"] = (
-        sensors_per_location_filter[location_filter_by]
-        + "_"
-        + sensors_per_location_filter["pollutant_name"]
-    )
-    sensors_per_location_filter["x_label"] = sensors_per_location_filter[
-        location_filter_by
-    ]
-
-    fig = px.bar(
-        sensors_per_location_filter.tail(15),
-        x="x_key",
-        y="sensor_id",
-        title=f"Top {location_filter_by}s with the Most Sensors Measuring {selected_pollutant.upper()}",
-        labels={
-            "sensor_id": "Number of Sensors",
-            "x_key": f"{location_filter_by} - Pollutant",
-        },
-    )
-
-    fig.update_layout(
-        xaxis=dict(
-            tickmode="array",
-            tickvals=sensors_per_location_filter["x_key"],
-            ticktext=sensors_per_location_filter["x_label"],
-        ),
-        xaxis_title="",
-        yaxis_title="Number of Sensors",
-        showlegend=True,
-    )
-
-    # Display the chart
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def generate_ranking_sensors_per_polluant(measures: pd.DataFrame):
-    sensors_per_location_filter = (
-        measures.groupby([location_filter_by, "pollutant_name"])["sensor_id"]
-        .nunique()
-        .reset_index()
-    )
-    sensors_per_location_filter = sensors_per_location_filter.sort_values(
-        by=["pollutant_name", "sensor_id"], ascending=False
-    )
-    pollutants = ["co", "o3", "no", "no2", "pm10", "pm25", "so2"]
-    top3 = pd.concat(
-        [
-            sensors_per_location_filter[
-                sensors_per_location_filter["pollutant_name"] == p
-            ].head(3)
-            for p in pollutants
-        ],
-        axis=0,
-    )
-    top3["x_key"] = top3[f"{location_filter_by}"] + "_" + top3["pollutant_name"]
-    top3["x_label"] = top3[f"{location_filter_by}"]
-
-    fig = px.bar(
-        top3,
-        x="x_key",
-        y="sensor_id",
-        color="pollutant_name",
-        title=f"Top 3 {location_filter_by}s with the Most Sensors per Pollutant",
-        labels={"nb_of_sensors": "Capteurs", "name": "Polluant"},
-    )
-
-    fig.update_layout(
-        xaxis=dict(
-            tickmode="array",
-            tickvals=top3["x_key"],
-            ticktext=top3["x_label"],
-        ),
-        xaxis_title="",
-        yaxis_title="Number of Sensors",
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def generate_ranking_sensors_all_polluant(measures: pd.DataFrame):
-    sensors_per_location_all_pollutants = (
-        measures.groupby([location_filter_by])["sensor_id"].nunique().reset_index()
-    )
-
-    sensors_per_location_pollutant = (
-        measures.groupby([location_filter_by, "pollutant_name"])["sensor_id"]
-        .nunique()
-        .reset_index()
-    )
-
-    merged_sensors = pd.merge(
-        sensors_per_location_all_pollutants,
-        sensors_per_location_pollutant,
-        on=location_filter_by,
-        how="left",
-        suffixes=("_total", "_by_pollutant"),
-    )
-
-    merged_sensors["x_key"] = (
-        merged_sensors[location_filter_by] + "_" + merged_sensors["pollutant_name"]
-    )
-
-    sensors_total_sorted = (
-        merged_sensors.groupby(location_filter_by)["sensor_id_total"]
-        .max()
-        .reset_index()
-    )
-    sensors_total_sorted = sensors_total_sorted.sort_values(
-        by="sensor_id_total", ascending=False
-    )
-
-    num_locations = len(sensors_total_sorted)
-    if num_locations <= 20:
-        df_combined = merged_sensors.loc[
-            merged_sensors[location_filter_by].isin(
-                sensors_total_sorted[location_filter_by]
-            )
-        ]
-    else:
-        df_top_10 = merged_sensors.loc[
-            merged_sensors[location_filter_by].isin(
-                sensors_total_sorted[location_filter_by].head(10)
-            )
-        ]
-        df_bottom_10 = merged_sensors.loc[
-            merged_sensors[location_filter_by].isin(
-                sensors_total_sorted[location_filter_by].tail(10)
-            )
-        ]
-        df_combined = pd.concat([df_top_10, df_bottom_10])
-
-    fig = px.bar(
-        df_combined,
-        x=location_filter_by,
-        y="sensor_id_by_pollutant",
-        color="pollutant_name",
-        title=f"Top Locations with the Most Sensors Measuring Various Pollutants",
-        labels={
-            "sensor_id_by_pollutant": "Number of Sensors",
-            "x_key": f"{location_filter_by} - Pollutant",
-        },
-    )
-
-    fig.update_layout(
-        xaxis_title="Location",
-        yaxis_title="Number of Sensors",
-        coloraxis_showscale=False,
-        barmode="stack",
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
 
 
 def generate_ranking_concentrations(measurements: pd.DataFrame):
@@ -520,18 +295,24 @@ with tab2:
     tab1, tab2, tab3 = st.tabs(["Concentrations", "Variation", "Number of sensors"])
     if toggle_all:
         with tab1:
-            generate_ranking_concentrations_all_polluant(measurements_data)
+            ranked_concentrations = rank_by_average_concentration(measurements_data, location_filter_by, pollutant_list)
+            bar_plot_average_concentrations(ranked_concentrations, location_filter_by)
+            #generate_ranking_concentrations_all_polluant(measurements_data)
         with tab2:
             generate_ranking_variation_all_polluant(reduction_data)
         with tab3:
-            generate_ranking_sensors_all_polluant(all_measures)
+            ranked_sensors = rank_by_number_of_sensors(all_measures, location_filter_by, pollutant_list)
+            bar_plot_ranking_sensors(ranked_sensors, location_filter_by)
     else:
         with tab1:
-            generate_ranking_concentrations(measurements_data)
+            ranked_concentrations = rank_by_average_concentration(measurements_data, location_filter_by, [selected_pollutant])
+            bar_plot_average_concentrations(ranked_concentrations, location_filter_by)
+            #generate_ranking_concentrations(measurements_data)
         with tab2:
             generate_ranking_variation(reduction_data)
         with tab3:
-            generate_ranking_sensors(all_measures)
+            ranked_sensors = rank_by_number_of_sensors(all_measures, location_filter_by, [selected_pollutant])
+            bar_plot_ranking_sensors(ranked_sensors, location_filter_by)
 
 
 def generate_time_serie(
