@@ -4,142 +4,47 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-from supabase import create_client, Client
+from datetime import datetime
 
 import folium
 from folium.plugins import HeatMap
 
-# --- Supabase config ---
-url = "https://dluhqrwmercbvgfhoxef.supabase.co"
-key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsdWhxcndtZXJjYnZnZmhveGVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM3NTc5ODUsImV4cCI6MjA1OTMzMzk4NX0._R5TinJKV42TU0pFn0ZhJnzDjqshX4NZesVl9O8KC9o"
-
-supabase: Client = create_client(url, key)
+from sidebar import create_sidebar
+from data_generation import get_all_measures,get_all_filtered_data
 
 
-# ----- SIDEBAR: Location Type → Location Value → Pollutant → Date ------
+pollutant_list = ["co", "o3", "no", "no2", "pm10", "pm25", "so2"]
 
-# Sidebar image
-st.sidebar.image(
-    "https://hlassets.paessler.com/common/files/graphics/iot/sub-visual_iot-monitoring_air-quality-monitoring-v1.png",
-    use_container_width=True,
-)
+all_measures = get_all_measures()
 
-st.sidebar.markdown("## 🌍 Air Quality Dashboard")
-# st.sidebar.markdown("### 🧭 Step-by-step filtering")
-
-# Load full dataset
-response = supabase.rpc("get_filter_data").execute()
-all_measures = pd.DataFrame(response.data)
-
-# Ensure datetime columns are parsed
-all_measures["datetime_from"] = pd.to_datetime(all_measures["datetime_from"])
-all_measures["datetime_to"] = pd.to_datetime(all_measures["datetime_to"])
-
-# 📌 Step 1: Choose location filter type
-location_filter_by = st.sidebar.radio(
-    "📌 Filter by location type",
-    options=["town", "department", "region"],
-    horizontal=True,
-)
-
-# 📍 Step 2: Choose specific location value
+(
+    location_filter_by,
+    selected_location,
+    selected_pollutant,
+    start_date,
+    end_date,
+    df_final,
+) = create_sidebar(all_measures)
 location_options = sorted(all_measures[location_filter_by].dropna().unique())
 
-col_loc, col_pollutant = st.sidebar.columns([2, 1])
-with col_loc:
-    selected_location = st.selectbox(
-        f"🏘️ Select a {location_filter_by}",
-        options=location_options,
-        key="location_select",
-    )
-df_location = all_measures[all_measures[location_filter_by] == selected_location].copy()
+st.markdown(f"### Data for {selected_location} and {selected_pollutant}")
 
-# 🧪 Step 3: Now get pollutants based on filtered location
-pollutants = sorted(df_location["pollutant_name"].dropna().unique())
-
-with col_pollutant:
-    selected_pollutant = st.selectbox(
-        "🧪 Polluant", options=pollutants, key="pollutant_select"
-    )
-
-df_pollutant = df_location[df_location["pollutant_name"] == selected_pollutant].copy()
-
-# 🗓️ Step 4: Date range selection
-min_date = df_pollutant["datetime_from"].min().date()
-max_date = df_pollutant["datetime_from"].max().date()
-
-col1, col2 = st.sidebar.columns(2)
-with col1:
-    start_date = pd.to_datetime(
-        st.date_input(
-            "📅 Start date",
-            value=min_date,
-            min_value=min_date,
-            max_value=max_date,
-        )
-    )
-with col2:
-    end_date = pd.to_datetime(
-        st.date_input(
-            "📅 End date",
-            value=max_date,
-            min_value=min_date,
-            max_value=max_date,
-        )
-    )
-
-# Filter final dataset by date range
-df_final = df_pollutant[
-    (df_pollutant["datetime_from"] >= start_date)
-    & (df_pollutant["datetime_to"] <= end_date)
-]
-
-# ✅ Show summary
-num_records = len(df_final)
-num_sensors = df_final["sensor_id"].nunique()
-
-st.sidebar.markdown("---")
-st.sidebar.success(
-    f"📍 `{selected_location}` • 🧪 `{selected_pollutant}`\n\n"
-    f"🔢 {num_records} records matched\n"
-    f"🛰️ {num_sensors} sensors"
-)
-with st.sidebar.expander("📊 Global Dataset Info"):
-    st.markdown(
-        f"🔢 **{all_measures.shape[0]}** total records \n\n"
-        f"🛰️ **{all_measures['sensor_id'].nunique()}** sensors\n\n"
-        f"📍 **{len(all_measures[location_filter_by].unique())}** {location_filter_by}s"
-    )
-
-st.markdown("### 📊 Dataset Summary")
-
-col1, col2, col3 = st.columns(3)
-
-col1.metric(label="Total Measurements", value=f"{all_measures.shape[0]:,}")
-col2.metric(label="🛰️ Unique Sensors", value=f"{all_measures['sensor_id'].nunique()}")
-col3.metric(
-    label=f"📍 {location_filter_by.title()} Count",
-    value=f"{all_measures[location_filter_by].nunique()}",
-)
-
-
+# --------------------------------------------------------------------------------
 start_date_str = start_date.strftime("%Y-%m-%d")
 end_date_str = end_date.strftime("%Y-%m-%d")
 
-# HEATMAP
-def generate_heatmap():
-    response = supabase.rpc(
-        "heatmap_data",
-        {
-            "pollutant_name": selected_pollutant,
-            "start_date": start_date.strftime("%Y-%m-%d"),
-            "end_date": end_date.strftime("%Y-%m-%d"),
-        },
-    ).execute()
+# Usage:
+data = get_all_filtered_data(selected_pollutant, start_date_str, end_date_str)
 
-    heat_df = pd.DataFrame(response.data)
-    heat_data = heat_df[["latitude", "longitude", "average"]].values.tolist()
+reduction_data = data["reduction_data"]
+measurements_data = data["measurements_data"]
+heat_data = data["heat_data"]
+seasons_data = data["seasons_data"]
+weekly_data = data["weekly_data"]
 
+
+def generate_heatmap(heat_measures: pd.DataFrame):
+    heat_data = heat_measures[["latitude", "longitude", "average"]].values.tolist()
     france_coordinates = [46.5, 2.2]
     # Create a folium map with a custom tile layer
     m = folium.Map(location=france_coordinates, zoom_start=6)
@@ -157,7 +62,7 @@ def generate_heatmap():
     HeatMap(heat_data, radius=25, blur=35, max_zoom=15, gradient=gradient).add_to(m)
 
     # Add custom tooltips without any markers/icons
-    for i, row in heat_df.iterrows():
+    for i, row in heat_measures.iterrows():
         tooltip = f"""
         <b>Ville:</b> {row['town']}<br>
         <b>Polluant:</b> {row['pollutant']}<br>
@@ -174,43 +79,473 @@ def generate_heatmap():
             tooltip=tooltip,
         ).add_to(m)
 
-    # Apply custom CSS for map container
-    st.markdown(
-        """
-        <style>
-        .folium-map {
-            height: 80vh;  /* 80% of the viewport height */
-            width: 100%;
-            border-radius: 10px;
-            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-        }
-        </style>
-    """,
-        unsafe_allow_html=True,
+    st.components.v1.html(
+        f"""
+        <div style="height:100%; width:100%;">
+            <style>
+                .folium-map {{
+                    height: 100%;
+                    width: 100%;
+                    border-radius: 10px;
+                    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+                }}
+                #map {{
+                    height: 100vh;
+                }}
+            </style>
+            {m.get_root().render()}
+        </div>
+        """,
+        height=700,  # You can adjust this if needed
+        scrolling=False,
     )
 
-    # Render the map with a responsive height
-    st.components.v1.html(m._repr_html_(), height=600)
 
-generate_heatmap()
+def generate_ranking_sensors(measures: pd.DataFrame):
+    sensors_per_location_filter = (
+        measures[measures["pollutant_name"] == selected_pollutant]
+        .groupby([location_filter_by, "pollutant_name"])["sensor_id"]
+        .nunique()
+        .reset_index()
+    )
+
+    sensors_per_location_filter = sensors_per_location_filter.sort_values(
+        by="sensor_id"
+    )
+
+    sensors_per_location_filter["x_key"] = (
+        sensors_per_location_filter[location_filter_by]
+        + "_"
+        + sensors_per_location_filter["pollutant_name"]
+    )
+    sensors_per_location_filter["x_label"] = sensors_per_location_filter[
+        location_filter_by
+    ]
+
+    fig = px.bar(
+        sensors_per_location_filter.tail(15),
+        x="x_key",
+        y="sensor_id",
+        title=f"Top {location_filter_by}s with the Most Sensors Measuring {selected_pollutant.upper()}",
+        labels={
+            "sensor_id": "Number of Sensors",
+            "x_key": f"{location_filter_by} - Pollutant",
+        },
+    )
+
+    fig.update_layout(
+        xaxis=dict(
+            tickmode="array",
+            tickvals=sensors_per_location_filter["x_key"],
+            ticktext=sensors_per_location_filter["x_label"],
+        ),
+        xaxis_title="",
+        yaxis_title="Number of Sensors",
+        showlegend=True,
+    )
+
+    # Display the chart
+    st.plotly_chart(fig, use_container_width=True)
 
 
+def generate_ranking_sensors_per_polluant(measures: pd.DataFrame):
+    sensors_per_location_filter = (
+        measures.groupby([location_filter_by, "pollutant_name"])["sensor_id"]
+        .nunique()
+        .reset_index()
+    )
+    sensors_per_location_filter = sensors_per_location_filter.sort_values(
+        by=["pollutant_name", "sensor_id"], ascending=False
+    )
+    pollutants = ["co", "o3", "no", "no2", "pm10", "pm25", "so2"]
+    top3 = pd.concat(
+        [
+            sensors_per_location_filter[
+                sensors_per_location_filter["pollutant_name"] == p
+            ].head(3)
+            for p in pollutants
+        ],
+        axis=0,
+    )
+    top3["x_key"] = top3[f"{location_filter_by}"] + "_" + top3["pollutant_name"]
+    top3["x_label"] = top3[f"{location_filter_by}"]
 
-def generate_time_serie(add_pollutant: str, compare_location: str):
-    # Now pass these string values to the RPC request
-    response = supabase.rpc(
-        "get_measurements_by_date_range",
-        {"start_date": start_date_str, "end_date": end_date_str},
-    ).execute()
-    df = pd.DataFrame(response.data)
-    df = df[df["department"] != "Not_found"]
-    df = df[df["region"] != "Île-de-france"]
+    fig = px.bar(
+        top3,
+        x="x_key",
+        y="sensor_id",
+        color="pollutant_name",
+        title=f"Top 3 {location_filter_by}s with the Most Sensors per Pollutant",
+        labels={"nb_of_sensors": "Capteurs", "name": "Polluant"},
+    )
 
-    if add_pollutant != "None":
-        pollutants = [selected_pollutant, add_pollutant]
+    fig.update_layout(
+        xaxis=dict(
+            tickmode="array",
+            tickvals=top3["x_key"],
+            ticktext=top3["x_label"],
+        ),
+        xaxis_title="",
+        yaxis_title="Number of Sensors",
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def generate_ranking_sensors_all_polluant(measures: pd.DataFrame):
+    sensors_per_location_all_pollutants = (
+        measures.groupby([location_filter_by])["sensor_id"].nunique().reset_index()
+    )
+
+    sensors_per_location_pollutant = (
+        measures.groupby([location_filter_by, "pollutant_name"])["sensor_id"]
+        .nunique()
+        .reset_index()
+    )
+
+    merged_sensors = pd.merge(
+        sensors_per_location_all_pollutants,
+        sensors_per_location_pollutant,
+        on=location_filter_by,
+        how="left",
+        suffixes=("_total", "_by_pollutant"),
+    )
+
+    merged_sensors["x_key"] = (
+        merged_sensors[location_filter_by] + "_" + merged_sensors["pollutant_name"]
+    )
+
+    sensors_total_sorted = (
+        merged_sensors.groupby(location_filter_by)["sensor_id_total"]
+        .max()
+        .reset_index()
+    )
+    sensors_total_sorted = sensors_total_sorted.sort_values(
+        by="sensor_id_total", ascending=False
+    )
+
+    num_locations = len(sensors_total_sorted)
+    if num_locations <= 20:
+        df_combined = merged_sensors.loc[
+            merged_sensors[location_filter_by].isin(
+                sensors_total_sorted[location_filter_by]
+            )
+        ]
     else:
+        df_top_10 = merged_sensors.loc[
+            merged_sensors[location_filter_by].isin(
+                sensors_total_sorted[location_filter_by].head(10)
+            )
+        ]
+        df_bottom_10 = merged_sensors.loc[
+            merged_sensors[location_filter_by].isin(
+                sensors_total_sorted[location_filter_by].tail(10)
+            )
+        ]
+        df_combined = pd.concat([df_top_10, df_bottom_10])
+
+    fig = px.bar(
+        df_combined,
+        x=location_filter_by,
+        y="sensor_id_by_pollutant",
+        color="pollutant_name",
+        title=f"Top Locations with the Most Sensors Measuring Various Pollutants",
+        labels={
+            "sensor_id_by_pollutant": "Number of Sensors",
+            "x_key": f"{location_filter_by} - Pollutant",
+        },
+    )
+
+    fig.update_layout(
+        xaxis_title="Location",
+        yaxis_title="Number of Sensors",
+        coloraxis_showscale=False,
+        barmode="stack",
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def generate_ranking_concentrations(measurements: pd.DataFrame):
+    avg_values_df = (
+        measurements.groupby([location_filter_by, "pollutant_name"])["value"]
+        .mean()
+        .reset_index()
+    )
+    avg_values_df["value"] = avg_values_df["value"].round(2)
+    avg_values_sorted = avg_values_df.sort_values(by="value", ascending=False)
+    filtered_df = avg_values_sorted[
+        avg_values_sorted["pollutant_name"] == selected_pollutant
+    ]
+
+    df_top = filtered_df.head(10)
+    df_bottom = filtered_df.tail(10)
+
+    df_top.loc[:, "pollution_level"] = "Highest concentration"
+    df_bottom.loc[:, "pollution_level"] = "Lowest concentration"
+
+    df_combined = pd.concat([df_top, df_bottom])
+
+    fig = px.bar(
+        df_combined,
+        x=f"{location_filter_by}",
+        y="value",
+        color="pollution_level",
+        title=f"{location_filter_by.capitalize()}s with the Highest and Lowest {selected_pollutant}",
+        labels={
+            "average": f"Concentration (µg/m³)",
+            f"{location_filter_by}": f"{location_filter_by}",
+        },
+    )
+
+    fig.update_layout(
+        xaxis_title="", yaxis_title="Average concentration (µg/m³)", showlegend=False
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def generate_ranking_concentrations_per_polluant(measurements: pd.DataFrame):
+
+    df_grouped = (
+        measurements.groupby([location_filter_by, "pollutant_name", "pollutant_units"])[
+            "value"
+        ]
+        .mean()
+        .reset_index()
+        .rename(columns={"value": "average"})
+    )
+
+    top3_list, bottom3_list = [], []
+
+    for pollutant in df_grouped["pollutant_name"].unique():
+        subset = df_grouped[df_grouped["pollutant_name"] == pollutant]
+
+        top3 = subset.nlargest(3, "average").copy()
+        bottom3 = subset.nsmallest(3, "average").copy()
+
+        top3["pollution_level"] = "Higher Concentration"
+        bottom3["pollution_level"] = "Lower Concentration"
+
+        top3_list.append(top3)
+        bottom3_list.append(bottom3)
+
+    df_top3 = pd.concat(top3_list)
+    df_bottom3 = pd.concat(bottom3_list)
+
+    df_top3["x_label"] = df_top3[location_filter_by] + " - " + df_top3["pollutant_name"]
+    df_bottom3["x_label"] = (
+        df_bottom3[location_filter_by] + " - " + df_bottom3["pollutant_name"]
+    )
+
+    y_max = max(df_top3["average"].max(), df_bottom3["average"].max()) * 1.1
+    y_label = f"Average concentration ({df_top3['pollutant_units'].iloc[0]})"
+
+    fig_top = px.bar(
+        df_top3,
+        x="x_label",
+        y="average",
+        color="pollutant_name",
+        title=f"Top 3 {location_filter_by.title()} with Highest Average Concentration per Pollutant",
+        labels={"average": y_label, "pollutant_name": "Pollutant"},
+    )
+    fig_top.update_layout(yaxis=dict(range=[0, y_max]), xaxis_title="")
+
+    fig_bottom = px.bar(
+        df_bottom3,
+        x="x_label",
+        y="average",
+        color="pollutant_name",
+        title=f"Top 3 {location_filter_by.title()} with Lowest Average Concentration per Pollutant",
+        labels={"average": y_label, "pollutant_name": "Pollutant"},
+    )
+    fig_bottom.update_layout(yaxis=dict(range=[0, y_max]), xaxis_title="")
+
+    # Step 6: Display both in Streamlit
+    st.plotly_chart(fig_top, use_container_width=True)
+    st.plotly_chart(fig_bottom, use_container_width=True)
+
+
+def generate_ranking_concentrations_all_polluant(measurements: pd.DataFrame):
+
+    df_grouped = (
+        measurements.groupby([location_filter_by, "pollutant_name"])["value"]
+        .sum()
+        .reset_index()
+    )
+
+    # Group by location to get the total pollution per location
+    df_total_pollution = (
+        df_grouped.groupby(location_filter_by)["value"].sum().reset_index()
+    )
+    df_total_pollution = df_total_pollution.rename(columns={"value": "total_pollution"})
+
+    # Merge the total pollution data with the grouped data
+    df_grouped = pd.merge(df_grouped, df_total_pollution, on=location_filter_by)
+
+    # Calculate the contribution of each pollutant to the total pollution
+    df_grouped["pollutant_contribution"] = (
+        df_grouped["value"] / df_grouped["total_pollution"]
+    )
+
+    # Create a pivot table where each column is a pollutant, and the values are the summed values per location
+    df_pivot = df_grouped.pivot_table(
+        index=location_filter_by,
+        columns="pollutant_name",
+        values="value",
+        aggfunc="sum",
+        fill_value=0,
+    )
+
+    # Sort by total pollution in descending order and select the top 10 highest and top 10 lowest locations
+    df_total_pollution_sorted = df_total_pollution.sort_values(
+        by="total_pollution", ascending=False
+    )
+
+    # Check how many unique locations we have
+    num_locations = len(df_total_pollution_sorted)
+
+    # Select the top and bottom 10 locations
+    if num_locations <= 20:
+        # If fewer than 20 locations, select all locations (no overlap)
+        df_combined = df_pivot.loc[df_total_pollution_sorted[location_filter_by]]
+    else:
+        # If more than 20 locations, select top 10 and bottom 10
+        df_top_10 = df_pivot.loc[df_total_pollution_sorted[location_filter_by].head(10)]
+        df_bottom_10 = df_pivot.loc[
+            df_total_pollution_sorted[location_filter_by].tail(10)
+        ]
+        df_combined = pd.concat([df_top_10, df_bottom_10])
+
+    # Create the stacked bar chart
+    fig = px.bar(
+        df_combined,
+        x=df_combined.index,
+        y=df_combined.columns,
+        title=f"Pollutant Contribution by Location (Top 10 Highest and Bottom 10 Lowest)",
+        labels={
+            location_filter_by: f"{location_filter_by.title()}",
+            "value": "Pollution (µg/m³)",
+        },
+    )
+
+    fig.update_layout(
+        barmode="stack",
+        xaxis_title="",
+        yaxis_title="Total Pollution (µg/m³)",
+        showlegend=True,
+    )
+
+    # Display the chart
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def generate_ranking_variation(reduction_data: pd.DataFrame):
+
+    df_per_pollutant = reduction_data[reduction_data["pollutant"] == selected_pollutant]
+    df_grouped = (
+        df_per_pollutant.groupby(f"{location_filter_by}")["reduction"]
+        .mean()
+        .reset_index()
+    )
+    df_grouped_sorted = df_grouped.sort_values(by="reduction", ascending=False)
+
+    df_top_positive = df_grouped_sorted.head(10).sort_values(by="reduction")
+    df_top_negative = df_grouped_sorted.tail(10).sort_values(by="reduction")
+
+    df_combined = pd.concat([df_top_negative, df_top_positive])
+
+    fig = px.bar(
+        df_combined,
+        x=f"{location_filter_by}",
+        y="reduction",
+        color="reduction",
+        title=f"{selected_pollutant} variation per {location_filter_by} between selected dates",
+        labels={"reduction": f"Variation de {selected_pollutant} (µg/m³)"},
+    )
+    fig.update_layout(
+        xaxis_title="",
+        yaxis_title=f"Concentration variation (µg/m³)",
+        coloraxis_showscale=False,
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def generate_ranking_variation_all_polluant(reduction_data: pd.DataFrame):
+
+    # Step 1: Group by location and sum the reductions across all pollutants
+    df_grouped = (
+        reduction_data.groupby(f"{location_filter_by}")["reduction"].sum().reset_index()
+    )
+
+    # Step 2: Sort the data by the total reduction
+    df_grouped_sorted = df_grouped.sort_values(by="reduction", ascending=False)
+
+    # Step 3: Get the top 10 positive and top 10 negative reductions
+    df_top_positive = df_grouped_sorted.head(10).sort_values(by="reduction")
+    df_top_negative = df_grouped_sorted.tail(10).sort_values(by="reduction")
+
+    # Combine top positive and negative reductions
+    df_combined = pd.concat([df_top_negative, df_top_positive])
+
+    # Step 4: Create the bar chart for the summed reduction
+    fig = px.bar(
+        df_combined,
+        x=f"{location_filter_by}",
+        y="reduction",
+        color="reduction",
+        title=f"Variation of Pollution Reduction across Locations from {start_date_str} to {end_date_str}",
+        labels={"reduction": "Variation de la pollution (µg/m³)"},
+    )
+
+    # Step 5: Update the layout of the plot
+    fig.update_layout(
+        xaxis_title="Location",
+        yaxis_title="Total Pollution Reduction (µg/m³)",
+        coloraxis_showscale=False,  # No color scale since we don't need it here
+    )
+
+    # Step 6: Display the plot
+    st.plotly_chart(fig, use_container_width=True)
+
+
+tab1, tab2 = st.tabs(["Map", "Ranking"])
+
+with tab1:
+    generate_heatmap(heat_data)
+
+with tab2:
+    toggle_all = st.toggle("Include all pollutants", key=1, value=False)
+
+    tab1, tab2, tab3 = st.tabs(["Concentrations", "Variation", "Number of sensors"])
+    if toggle_all:
+        with tab1:
+            generate_ranking_concentrations_all_polluant(measurements_data)
+        with tab2:
+            generate_ranking_variation_all_polluant(reduction_data)
+        with tab3:
+            generate_ranking_sensors_all_polluant(all_measures)
+    else:
+        with tab1:
+            generate_ranking_concentrations(measurements_data)
+        with tab2:
+            generate_ranking_variation(reduction_data)
+        with tab3:
+            generate_ranking_sensors(all_measures)
+
+
+def generate_time_serie(
+    measurements: pd.DataFrame, add_pollutant: list[str], compare_location: str
+):
+    # Now pass these string values to the RPC request
+    if add_pollutant != ["None"]:
+        add_pollutant.append(selected_pollutant)
+        pollutants = add_pollutant
+    else:
+        print("imhere")
         pollutants = [selected_pollutant]
-    df = df[df["pollutant_name"].isin(pollutants)]
+
+    df = measurements[measurements["pollutant_name"].isin(pollutants)]
 
     df_filtered = df[
         df[location_filter_by].str.contains(selected_location, case=False, na=False)
@@ -222,16 +557,6 @@ def generate_time_serie(add_pollutant: str, compare_location: str):
         .agg(average=("value", "mean"))
         .reset_index()
     )
-
-    # Get rank
-    df_rank = (
-        df_grouped.groupby(by=[location_filter_by])
-        .agg(average=("average", "mean"))
-        .sort_values(by="average", ascending=False)
-        .reset_index()
-    )
-    rank = df_rank[df_rank[location_filter_by] == selected_location].index[0]
-    print(f"rank = {rank} / {df_rank.shape[0]}")
 
     # Step 2: Filter the data for the specific town (e.g., Orléans)
     df_filtered = df_grouped[df_grouped[location_filter_by] == f"{selected_location}"]
@@ -335,23 +660,11 @@ def generate_time_serie(add_pollutant: str, compare_location: str):
 
     st.plotly_chart(fig, use_container_width=True)
 
-#generate_time_serie(add_pollutant, compare_location)
 
-def generate_seasons_pie():
-    response = supabase.rpc(
-        "get_seasons",
-        {
-            "pollutant_name": selected_pollutant,
-            "start_date": start_date_str,
-            "end_date": end_date_str,
-        },
-    ).execute()
-    df = pd.DataFrame(response.data)
-    df = df[df["department"] != "Not_found"]
-    df = df[df["region"] != "Île-de-france"]
+def generate_seasons_pie(seasons_df: pd.DataFrame):
 
-    df_filtered = df[
-        df.apply(
+    df_filtered = seasons_df[
+        seasons_df.apply(
             lambda row: row.astype(str).str.contains(f"{selected_location}").any(),
             axis=1,
         )
@@ -376,21 +689,12 @@ def generate_seasons_pie():
 
     st.plotly_chart(fig, use_container_width=True)
 
-def generate_weekly_pie():
-    response = supabase.rpc(
-        "get_week_type",
-        {
-            "pollutant_name": selected_pollutant,
-            "start_date": start_date_str,
-            "end_date": end_date_str,
-        },
-    ).execute()
-    df = pd.DataFrame(response.data)
-    df = df[df["department"] != "Not_found"]
-    df = df[df["region"] != "Île-de-france"]
-    df_filtered = df[
-        df.apply(
-            lambda row: row.astype(str).str.contains(f"{selected_location}").any(), axis=1
+
+def generate_weekly_pie(weekly_df: pd.DataFrame):
+    df_filtered = weekly_df[
+        weekly_df.apply(
+            lambda row: row.astype(str).str.contains(f"{selected_location}").any(),
+            axis=1,
         )
     ]
     df_grouped = df_filtered.groupby("week_type")["average"].mean().reset_index()
@@ -413,36 +717,148 @@ def generate_weekly_pie():
     st.plotly_chart(fig, use_container_width=True)
 
 
-tab1, tab2, tab3 = st.tabs(["📅 All time", "📅 By Season", "📆 By Week/Weekend"])
+def get_concentration_ranking(
+    measurements: pd.DataFrame,
+    add_pollutant: list[str],
+    location: str,
+):
+    df_grouped = (
+        measurements.groupby([f"{location_filter_by}", "pollutant_name"])["value"]
+        .sum()
+        .reset_index()
+    )
+    df_sorted = df_grouped.sort_values(by="value", ascending=True)
+    pollutants = [selected_pollutant]
+    pollutants.extend(add_pollutant)
+    filtered = df_sorted[df_sorted["pollutant_name"].isin(pollutants)].reset_index(
+        drop=True
+    )
+    value = filtered[filtered["town"] == selected_location]["value"].to_numpy()[0]
+    rank = filtered[filtered[f"{location_filter_by}"] == location].index[0]
+    pool = filtered.shape[0]
+    return value, rank, pool
 
-with tab1:
-    # Time serie
-    col1, col2 = st.columns(2)
 
-    # First selectbox for Compare Pollutant
-    with col1:
-        add_pollutant = st.selectbox(
-            "🧪 Compare with polluant",
-            options=["None"] + pollutants,
-            index=0,
-            key="pollutant_select_1",
+def get_variation_ranking(
+    reduction_df: pd.DataFrame,
+    add_pollutant: list[str],
+    location: str,
+):
+    df = (
+        reduction_df.groupby([f"{location_filter_by}", "pollutant"]).sum().reset_index()
+    )
+
+    pollutants = [f"{selected_pollutant}"]
+    pollutants.extend(add_pollutant)
+    filtered_by_pol = df[df["pollutant"].isin(pollutants)]
+
+    all_pol = (
+        filtered_by_pol.groupby([f"{location_filter_by}"])
+        .sum()
+        .reset_index()
+        .sort_values(by="reduction")
+    ).reset_index(drop=True)
+    all_pol_red = all_pol[all_pol[f"{location_filter_by}"] == f"{location}"][
+        "reduction"
+    ].to_numpy()[0]
+    all_pol_rank = all_pol[all_pol[f"{location_filter_by}"] == f"{location}"].index[0]
+    all_pol_pool = all_pol.shape[0] - 1
+
+    return all_pol_red, all_pol_rank, all_pol_pool
+
+
+toggle_all_2 = st.toggle("🔄 Show all pollutants", key=2, value=False)
+tab1, tab2 = st.tabs(["📈 Time Series", "🏆 Rankings"])
+if toggle_all_2:
+    st.markdown("### 📊 Showing trends across all pollutants")
+
+    with tab1:
+        generate_time_serie(
+            measurements=measurements_data,
+            add_pollutant=pollutant_list,
+            compare_location="",
+        )
+    with tab2:
+        reduction, rank, pool = get_variation_ranking(
+            reduction_df=reduction_data,
+            add_pollutant=pollutant_list,
+            location=selected_location,
+        )
+        st.markdown(f"red{reduction}, rank {rank}, pool {pool}")
+else:
+    with st.expander("🔍 Optional: Add a comparison"):
+        col1, col2 = st.columns(2)
+        with col1:
+            add_pollutant = [
+                st.radio(
+                    "🧪 Compare with another pollutant:",
+                    options=["None"] + pollutant_list,
+                    horizontal=True,
+                )
+            ]
+        with col2:
+            compare_location = st.selectbox(
+                f"🏘️ Compare with another {location_filter_by.lower()}",
+                options=["None"] + location_options,
+                index=0,
+            )
+
+    with tab1:
+        generate_time_serie(
+            measurements=measurements_data,
+            add_pollutant=add_pollutant,
+            compare_location=compare_location,
+        )
+    with tab2:
+        # Header Section
+        # Title Section
+        st.markdown("### Pollution Overview")
+
+        # Fetch concentration and reduction data
+        value, con_rank, con_pool = get_concentration_ranking(
+            measurements=measurements_data,
+            add_pollutant=add_pollutant,
+            location=selected_location,
+        )
+        reduction, rank, pool = get_variation_ranking(
+            reduction_df=reduction_data,
+            add_pollutant=add_pollutant,
+            location=selected_location,
         )
 
-    with col2:
-        compare_location = st.selectbox(
-            f"🏘️ Compare with {location_filter_by}",
-            options=["None"] + location_options,
-            index=0,
-            key="location_select_1",
+        # Latest Concentration (Current value of pollutants)
+        st.metric(
+            label="Concentration (µg/m³)",
+            value=f"{value:.2f} @ the end date",
+            delta=f"{reduction:.2f} from start date to end date",
+            delta_color="inverse",
         )
 
-    generate_time_serie(add_pollutant, compare_location)
+        # Ranking Section (How the location ranks in reduction)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"**🏆 Rank:** {rank}")
+        with col2:
+            st.markdown(f"**🌍 Pollution Pool:** {pool} locations")
 
-with tab2:
-    generate_seasons_pie()
+        # Caption to explain the data source and timing
+        st.caption("Based on data between the selected dates.")
+        if compare_location != "None":
+            reduction_2, rank_2, pool_2 = get_concentration_ranking(
+                measurements=measurements_data,
+                add_pollutant=add_pollutant,
+                location=compare_location,
+            )
+            st.markdown(f"red{reduction_2}, rank {rank_2}, pool {pool_2}")
 
-with tab3:
-    generate_weekly_pie()
+
+with st.expander("📊 Cyclical ?"):
+    tab1, tab2 = st.tabs(["📅 By Season", "📆 By Week/Weekend"])
+    with tab1:
+        generate_seasons_pie(seasons_data)
+
+    with tab2:
+        generate_weekly_pie(weekly_data)
 
 
 # --- Hide Streamlit Default Styling ---
