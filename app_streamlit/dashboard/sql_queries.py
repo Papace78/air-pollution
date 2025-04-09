@@ -1,6 +1,4 @@
-#Output all sensors by locations, polluant and measurements dates
-#"get_filter_data"
-sql_query = """
+get_filter_data = """
 SELECT
 l.town,
 l.region,
@@ -16,9 +14,7 @@ JOIN pollutants AS p ON p.id = s.pollutant_id
 JOIN measurements AS m ON m.sensor_id = s.id
 """
 
-
-#heatmap_data
-sql_query = """
+heatmap_data = """
 SELECT
   l.town,
   p.name AS pollutant,
@@ -39,7 +35,6 @@ ORDER BY average DESC;
 """
 
 
-#timeseries data
 get_measurements_by_date_range= """
 SELECT
     l.town,
@@ -59,7 +54,6 @@ WHERE
 """
 
 
-#season data
 get_seasons = """
 SELECT
   l.town,

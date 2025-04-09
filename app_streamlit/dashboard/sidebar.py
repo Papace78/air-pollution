@@ -12,13 +12,14 @@ def create_sidebar(all_measures: pd.DataFrame):
         use_container_width=True,
     )
 
-    st.sidebar.markdown("## 🌍 Air Quality Dashboard")
+    #st.sidebar.markdown("## 🌍 Air Quality Dashboard")
 
     # 📌 Step 1: Choose location filter type
     location_filter_by = st.sidebar.radio(
         "📌 Filter by location type",
         options=["town", "department", "region"],
         horizontal=True,
+        label_visibility="collapsed"
     )
 
     # 📍 Step 2: Choose specific location value
@@ -36,12 +37,12 @@ def create_sidebar(all_measures: pd.DataFrame):
     df_location = all_measures[all_measures[location_filter_by] == selected_location].copy()
 
     # 🧪 Step 3: Now get pollutants based on filtered location
-    pollutants = sorted(df_location["pollutant_name"].dropna().unique())
+    pollutant_filter_by = sorted(df_location["pollutant_name"].dropna().unique())
 
     with col_pollutant:
         selected_pollutant = st.selectbox(
             "🧪 Polluant",
-            options=pollutants,
+            options=pollutant_filter_by,
             key="pollutant_select",
         )
 
@@ -50,27 +51,23 @@ def create_sidebar(all_measures: pd.DataFrame):
     # 🗓️ Step 4: Date range selection
     min_date = df_pollutant["datetime_from"].min().date()
     max_date = df_pollutant["datetime_from"].max().date()
-    default_start = datetime.strptime("2023-01-01", "%Y-%m-%d").date()
+    default_start = datetime.strptime("2023-03-01", "%Y-%m-%d").date()
 
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        start_date = pd.to_datetime(
-            st.date_input(
-                "📅 Start date",
-                value=default_start if default_start > min_date else min_date,
-                min_value=min_date,
-                max_value=max_date,
-            )
-        )
-    with col2:
-        end_date = pd.to_datetime(
-            st.date_input(
-                "📅 End date",
-                value=max_date,
-                min_value=min_date,
-                max_value=max_date,
-            )
-        )
+    if default_start < min_date:
+        default_start = min_date
+    elif default_start > max_date:
+        default_start = max_date
+
+    start_date, end_date = st.sidebar.slider(
+    "Select date range:",
+    min_value=min_date,
+    max_value=max_date,
+    value=(default_start, max_date),
+    format="YYYY-MM-DD",
+    label_visibility="visible"
+    )
+    start_date = pd.to_datetime(start_date)
+    end_date = pd.to_datetime(end_date)
 
     # Filter final dataset by date range
     df_final = df_pollutant[
@@ -84,7 +81,6 @@ def create_sidebar(all_measures: pd.DataFrame):
 
     st.sidebar.markdown("---")
     st.sidebar.success(
-        f"📍 `{selected_location}` • 🧪 `{selected_pollutant}`\n\n"
         f"🔢 {num_records} records matched\n"
         f"🛰️ {num_sensors} sensors"
     )
@@ -95,4 +91,4 @@ def create_sidebar(all_measures: pd.DataFrame):
             f"📍 **{len(all_measures[location_filter_by].unique())}** {location_filter_by}s"
         )
 
-    return location_filter_by, selected_location, selected_pollutant, start_date, end_date, df_final
+    return location_filter_by, selected_location, pollutant_filter_by, selected_pollutant, start_date, end_date, df_final
