@@ -45,7 +45,7 @@ def get_heatmap_measures(
         "heatmap_data",
         {
             "pollutant_name": pollutant_name,
-            "start_date": start_date,
+            "start_date": end_date, #hack to only generate latest instead of average
             "end_date": end_date,
         },
     ).execute()
