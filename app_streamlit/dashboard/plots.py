@@ -1,3 +1,5 @@
+"""Plot functions once dataframe are transformed."""
+
 import pandas as pd
 
 import folium
@@ -76,7 +78,7 @@ def bar_plot_ranking_sensors(
         x=f"{location_filter_by}",
         y="sensor_id",
         color="pollutant_name",
-        title=f"Top {location_filter_by}s with the Most Sensors",
+        title=f"{location_filter_by.capitalize()}s with the Most Sensors",
         labels={
             "sensor_id": "Number of Sensors",
             "x_key": f"{location_filter_by} - Pollutant",
@@ -107,7 +109,7 @@ def bar_plot_average_concentration(
         x=f"{location_filter_by}",
         y="value",
         color="pollutant_name",
-        title=f"Average {location_filter_by}s with Average Pollutant Values",
+        title=f"{location_filter_by.capitalize()}s with Highest Average Pollutant Values",
         labels={
             "value": "Average Value",
             f"{location_filter_by}": f"{location_filter_by} - Pollutant",
@@ -121,7 +123,7 @@ def bar_plot_average_concentration(
             ticktext=avg_value_df[f"{location_filter_by}"],
         ),
         xaxis_title="",
-        yaxis_title="Average Pollutant Value",
+        yaxis_title="Concentration (µg/m³)",
         showlegend=True,
         barmode="stack",
     )
@@ -143,34 +145,29 @@ def bar_plot_average_variation(
                            'pollutant', 'reduction', 'total_reduction'.
         location_filter_by (str): Column name to group data by (default: 'town').
     """
-
-    # Step 1: Calculate the average reduction per pollutant for each location
     avg_reduction = (
-        df.groupby([location_filter_by, "pollutant"])["reduction"]
+        df.groupby([location_filter_by, "pollutant_name"])["reduction"]
         .mean()
         .reset_index(name="avg_reduction")
     )
 
-    # Step 2: Create hover text with average reduction per pollutant
     avg_hover_data = (
         avg_reduction.groupby(location_filter_by)
         .apply(
             lambda x: "<br>".join(
                 [
                     f"{p}: {r:.2f} µg/m³"
-                    for p, r in zip(x["pollutant"], x["avg_reduction"])
+                    for p, r in zip(x["pollutant_name"], x["avg_reduction"])
                 ]
             )
         )
         .reset_index(name="hover_text")
     )
 
-    # Step 3: Aggregate total_reduction by location (e.g., town, department, region)
     plot_df = (
         df.groupby(location_filter_by)["total_reduction"].max().reset_index()
-    )  # max() to get total_reduction for each location
+    )
 
-    # Step 4: Merge hover data with the aggregated total_reduction data
     plot_df = plot_df.merge(avg_hover_data, on=location_filter_by)
     plot_df["sort_order"] = plot_df[location_filter_by].apply(
         lambda x: 0 if "SELECTED" in str(x) else 1
@@ -179,11 +176,10 @@ def bar_plot_average_variation(
         by=["sort_order", "total_reduction"], ascending=[False, False]
     )
 
-    # Step 5: Create the bar chart using Plotly
     fig = px.bar(
         plot_df,
         x=location_filter_by,
-        y="total_reduction",  # Use 'total_reduction' as is
+        y="total_reduction",
         labels={"total_reduction": "Total Reduction (µg/m³)"},
         hover_data={
             "hover_text": True,
@@ -192,19 +188,16 @@ def bar_plot_average_variation(
         },
     )
 
-    # Customize hover template
     fig.update_traces(
         hovertemplate="<b>%{x}</b><br>Total: %{y:.2f} µg/m³<br>%{customdata[0]}",
         marker_line_color="rgba(0,0,0,0.2)",
         marker_line_width=1,
     )
 
-    # Update layout
     fig.update_layout(
-        title=f"Pollution Reduction Analysis by {location_filter_by.title()} with Average Pollutant Reduction on Hover",
+        title=f"{location_filter_by.title()} with Largest Pollutant Variation",
         xaxis_title=None,
         yaxis_title="Total Reduction (µg/m³)",
-        # hoverlabel=dict(bgcolor="white", font_size=12),
     )
 
     st.plotly_chart(fig, use_container_width=True)
@@ -303,24 +296,10 @@ def pie_plot_seasons(df: pd.DataFrame):
     fig = px.pie(
         df,
         names="season",
-        values="average",
-        labels={"average": "Mean concentration (µg/m³)"},
+        title = "Seasonal average concentrations",
+        values="value",
+        labels={"value": "Mean concentration (µg/m³)"},
     )
-
-    fig.update_layout(showlegend=False)
-    fig.update_traces(textinfo="percent+label")
-
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def pie_plot_weekly(df:pd.DataFrame):
-    fig = px.pie(
-    df,
-    names="week_type",
-    values="average",
-    labels={"average": "Average concentration (µg/m³)"},
-    color="week_type",
-)
 
     fig.update_layout(showlegend=False)
     fig.update_traces(textinfo="percent+label")

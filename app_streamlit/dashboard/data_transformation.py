@@ -1,3 +1,5 @@
+"""Transforms the data imported from postgreSQL database."""
+
 import pandas as pd
 
 
@@ -14,7 +16,9 @@ class PollutionSensors:
         Rank locations by the number of sensors per pollutant and return a ranked dataframe.
         """
         # Step 1: Get the number of sensors per location and pollutant
-        sensors_per_location = cls.group_by_number_of_sensors(locations_df, location_filter_by)
+        sensors_per_location = cls.group_by_number_of_sensors(
+            locations_df, location_filter_by
+        )
 
         # Step 2: Rank the locations based on the number of sensors
         ranked_sensors = cls.rank_by_number_of_sensors_per_pollutants(
@@ -24,7 +28,9 @@ class PollutionSensors:
         return ranked_sensors
 
     @staticmethod
-    def group_by_number_of_sensors(locations_df: pd.DataFrame, location_filter_by: str) -> pd.DataFrame:
+    def group_by_number_of_sensors(
+        locations_df: pd.DataFrame, location_filter_by: str
+    ) -> pd.DataFrame:
         """
         Group the dataframe by location and pollutant, and count the number of unique sensors.
         """
@@ -45,7 +51,9 @@ class PollutionSensors:
 
     @staticmethod
     def rank_by_number_of_sensors_per_pollutants(
-        sensors_per_location: pd.DataFrame, location_filter_by: str, pollutants: list[str]
+        sensors_per_location: pd.DataFrame,
+        location_filter_by: str,
+        pollutants: list[str],
     ) -> pd.DataFrame:
         """
         Rank locations by the number of sensors they have for each pollutant.
@@ -68,7 +76,9 @@ class PollutionSensors:
 
         # Filter the original data to include only the top locations
         filtered_grouped = sensors_per_location[
-            sensors_per_location[location_filter_by].isin(top_locations_sorted[location_filter_by])
+            sensors_per_location[location_filter_by].isin(
+                top_locations_sorted[location_filter_by]
+            )
         ]
 
         # Order the locations and sort
@@ -81,8 +91,8 @@ class PollutionSensors:
 
         return filtered_grouped
 
-class PollutionVariation:
 
+class PollutionVariation:
     @classmethod
     def rank_by_average_variation(
         cls,
@@ -90,63 +100,37 @@ class PollutionVariation:
         location_filter_by: str,
         pollutants: list[str],
         reference_locations: list[str] = [],
-        top_n: int = 5
+        top_n: int = 5,
     ) -> pd.DataFrame:
-        # Step 1: Get valid locations with all target pollutants
-        valid_locations = cls.get_valid_locations(df, location_filter_by, pollutants)
+        filtered_df = df[df["pollutant_name"].isin(pollutants)]
+        lowest_locs, highest_locs = cls.get_top_and_bottom_reductions(
+            filtered_df, location_filter_by, top_n
+        )
 
-        # Step 2: Filter dataframe for only valid locations and target pollutants
-        filtered_df = cls.filter_reduction_data(df, location_filter_by, pollutants, valid_locations)
+        main_df = cls.filter_df_by_top_bottom_locations(
+            filtered_df, lowest_locs, highest_locs, location_filter_by
+        )
 
-        # Step 3: Get top and bottom locations by total reduction
-        lowest_locs, highest_locs = cls.get_top_and_bottom_reductions(filtered_df, location_filter_by, top_n)
-
-        # Step 4: Filter filtered_df to only include top and bottom locations
-        main_df = cls.filter_df_by_top_bottom_locations(filtered_df, lowest_locs, highest_locs, location_filter_by)
-
-        # Step 5: Build reference data (if any)
-        reference_df = cls.build_reference_location_df(df, location_filter_by, pollutants, reference_locations)
+        reference_df = cls.build_reference_location_df(
+            df, location_filter_by, pollutants, reference_locations
+        )
         if not reference_df.empty:
             reference_df[location_filter_by] = "SELECTED: " + reference_df[
                 location_filter_by
             ].astype(str)
-        # Step 6: Combine main and reference data
-        combined_df = pd.concat([main_df, reference_df], ignore_index=True) if not reference_df.empty else main_df
 
-        # Step 7: Add total reduction column
+        combined_df = (
+            pd.concat([main_df, reference_df], ignore_index=True)
+            if not reference_df.empty
+            else main_df
+        )
         combined_df = cls.add_total_reduction_column(combined_df, location_filter_by)
-
         return combined_df
 
     @staticmethod
-    def get_valid_locations(df: pd.DataFrame, location_filter_by: str, pollutants: list[str]) -> pd.Series:
-        """
-        Returns a Series of locations (e.g., towns, departments, etc.) that have at least one entry
-        for each pollutant in the `pollutants` list.
-        """
-        df_filtered = df[df["pollutant"].isin(pollutants)]
-        pollutant_counts = (
-            df_filtered.groupby(location_filter_by)["pollutant"]
-            .nunique()
-            .reset_index(name="pollutant_count")
-        )
-
-        valid_locations = pollutant_counts[
-            pollutant_counts["pollutant_count"] >= len(pollutants)
-        ][location_filter_by]
-
-        return valid_locations
-
-    @staticmethod
-    def filter_reduction_data(df: pd.DataFrame, location_filter_by: str, pollutants: list[str], valid_locations: pd.Series) -> pd.DataFrame:
-        df_filtered = df[
-            (df[location_filter_by].isin(valid_locations))
-            & (df["pollutant"].isin(pollutants))
-        ].copy()
-        return df_filtered
-
-    @staticmethod
-    def get_top_and_bottom_reductions(df_filtered: pd.DataFrame, location_filter_by: str, top_n: int = 5) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def get_top_and_bottom_reductions(
+        df_filtered: pd.DataFrame, location_filter_by: str, top_n: int = 5
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
         reduction_sums = (
             df_filtered.groupby(location_filter_by, as_index=False)["reduction"]
             .sum()
@@ -157,27 +141,43 @@ class PollutionVariation:
         return lowest, highest
 
     @staticmethod
-    def filter_df_by_top_bottom_locations(df_filtered: pd.DataFrame, lowest: pd.DataFrame, highest: pd.DataFrame, location_filter_by: str) -> pd.DataFrame:
+    def filter_df_by_top_bottom_locations(
+        df_filtered: pd.DataFrame,
+        lowest: pd.DataFrame,
+        highest: pd.DataFrame,
+        location_filter_by: str,
+    ) -> pd.DataFrame:
         top_locations = pd.concat([lowest, highest])[location_filter_by].unique()
         return df_filtered[df_filtered[location_filter_by].isin(top_locations)]
 
     @staticmethod
-    def build_reference_location_df(df: pd.DataFrame, location_filter_by: str, pollutants: list[str], reference_locations: list[str]) -> pd.DataFrame:
+    def build_reference_location_df(
+        df: pd.DataFrame,
+        location_filter_by: str,
+        pollutants: list[str],
+        reference_locations: list[str],
+    ) -> pd.DataFrame:
         if not reference_locations:
             return pd.DataFrame()
 
         ref_df = df[
             (df[location_filter_by].isin(reference_locations))
-            & (df["pollutant"].isin(pollutants))
+            & (df["pollutant_name"].isin(pollutants))
         ]
 
-        grouped_ref = ref_df.groupby([location_filter_by, "pollutant"], as_index=False)["reduction"].mean()
+        grouped_ref = ref_df.groupby([location_filter_by, "pollutant_name"], as_index=False)[
+            "reduction"
+        ].mean()
         return grouped_ref
 
     @staticmethod
-    def add_total_reduction_column(df: pd.DataFrame, location_filter_by: str) -> pd.DataFrame:
+    def add_total_reduction_column(
+        df: pd.DataFrame, location_filter_by: str
+    ) -> pd.DataFrame:
         avg_reduction_per_pollutant = (
-            df.groupby([location_filter_by, "pollutant"])["reduction"].mean().reset_index()
+            df.groupby([location_filter_by, "pollutant_name"])["reduction"]
+            .mean()
+            .reset_index()
         )
         total_reduction = (
             avg_reduction_per_pollutant.groupby(location_filter_by)["reduction"]
@@ -188,6 +188,7 @@ class PollutionVariation:
             total_reduction.set_index(location_filter_by)["reduction"]
         )
         return df
+
 
 class PollutionLevel:
 
@@ -201,7 +202,9 @@ class PollutionLevel:
         reference_locations: list[str] = None,
     ) -> pd.DataFrame:
         # Step 1: Get valid locations with all target pollutants
-        valid_locations = cls.get_valid_locations(measurements_df, location_filter_by, pollutants)
+        valid_locations = cls.get_valid_locations(
+            measurements_df, location_filter_by, pollutants
+        )
 
         # Step 2: Filter and average pollutants
         avg_pollutant_df = cls.filter_and_avg_pollutants(
@@ -209,10 +212,14 @@ class PollutionLevel:
         )
 
         # Step 3: Get top N locations based on average concentration
-        top_locations = cls.get_top_locations(avg_pollutant_df, location_filter_by, top_n)
+        top_locations = cls.get_top_locations(
+            avg_pollutant_df, location_filter_by, top_n
+        )
 
         # Step 4: Filter the dataframe for the top locations
-        avg_pollutant_df = avg_pollutant_df[avg_pollutant_df[location_filter_by].isin(top_locations)]
+        avg_pollutant_df = avg_pollutant_df[
+            avg_pollutant_df[location_filter_by].isin(top_locations)
+        ]
 
         # Step 5: Build reference location data if provided
         reference_location_df = (
@@ -266,7 +273,9 @@ class PollutionLevel:
             (df[location_filter_by].isin(valid_locations))
             & (df["pollutant_name"].isin(pollutants))
         ]
-        return df_filtered.groupby([location_filter_by, "pollutant_name"], as_index=False)["value"].mean()
+        return df_filtered.groupby(
+            [location_filter_by, "pollutant_name"], as_index=False
+        )["value"].mean()
 
     @staticmethod
     def get_top_locations(
@@ -294,7 +303,8 @@ class PollutionLevel:
         ref_dfs = []
         for ref in reference_locations:
             ref_df = df[
-                (df[location_filter_by] == ref) & (df["pollutant_name"].isin(pollutants))
+                (df[location_filter_by] == ref)
+                & (df["pollutant_name"].isin(pollutants))
             ]
             if ref_df.empty:
                 continue
@@ -329,6 +339,7 @@ class PollutionLevel:
             avg_df[location_filter_by].astype(str) + "_" + avg_df["pollutant_name"]
         )
         return avg_df
+
 
 def prepare_time_series_data(
     measurements: pd.DataFrame,
@@ -369,44 +380,65 @@ def prepare_time_series_data(
 
     return df_filtered, df_compare
 
+
 def build_seasons_df(
-    seasons_df: pd.DataFrame,
-    selected_location: str,
-    location_filter_by: str,
-    pollutants: list[str],
+    df: pd.DataFrame,
+    selected_pollutants: list[str],
 ):
-    df_filtered = seasons_df[
-        seasons_df[location_filter_by].str.contains(selected_location, case=False, na=False)
-    ]
-    df_filtered = df_filtered[df_filtered["pollutant"].isin(pollutants)]
-    df_grouped = df_filtered.groupby("season")["average"].mean().reset_index()
+    df_filtered = df[df["pollutant_name"].isin(selected_pollutants)]
+
+    df_filtered["datetime_from"] = pd.to_datetime(df_filtered["datetime_from"])
+
+    # Function to determine the season from a datetime
+    def get_season(date):
+        month = date.month
+        if month in [12, 1, 2]:
+            return "Winter"
+        elif month in [3, 4, 5]:
+            return "Spring"
+        elif month in [6, 7, 8]:
+            return "Summer"
+        else:
+            return "Fall"
+
+    # Apply the function to create a 'season' column
+    df_filtered["season"] = df_filtered["datetime_from"].apply(get_season)
+
+    # Calculate total values per season
+    seasonal_values = (
+        df_filtered.groupby(["season"])["value"].mean().round(2).reset_index()
+    )
 
     season_order = ["Spring", "Summer", "Fall", "Winter"]
-    df_grouped["season"] = pd.Categorical(
-        df_grouped["season"], categories=season_order, ordered=True
+    seasonal_values["season"] = pd.Categorical(
+        seasonal_values["season"], categories=season_order, ordered=True
     )
 
-    return df_grouped
+    return seasonal_values
 
-def build_weekly_df(
-    weekly_df: pd.DataFrame,
-    selected_location: str,
-    location_filter_by: str,
-    pollutant_filter_by: list[str] = None,
-):
-    df_filtered = weekly_df[
-        weekly_df[location_filter_by].str.contains(
-            selected_location, case=False, na=False
-        )
-    ]
 
-    if pollutant_filter_by:
-        df_filtered = df_filtered[df_filtered["pollutant"].isin(pollutant_filter_by)]
+def transforms_measures_to_reduction(df, start_date, end_date):
+    df['datetime_from'] = pd.to_datetime(df['datetime_from'])
+    df['datetime_to'] = pd.to_datetime(df['datetime_to'])
 
-    df_grouped = df_filtered.groupby("week_type")["average"].mean().reset_index()
+    # Define your start and end date
+    start_date = pd.to_datetime('2023-04-01')
+    end_date = pd.to_datetime('2025-04-01')
+# Find the closest datetime_from and datetime_to for each town and pollutant
+    def find_closest_dates(group, start_date, end_date):
+        closest_start = group.iloc[(group['datetime_from'] - start_date).abs().argmin()]
+        closest_end = group.iloc[(group['datetime_to'] - end_date).abs().argmin()]
 
-    df_grouped["week_type"] = pd.Categorical(
-        df_grouped["week_type"], categories=["Weekdays", "Weekend"], ordered=True
-    )
+        return pd.DataFrame([{
+            'town': closest_start['town'],
+            'department': closest_start['department'],
+            'region': closest_start['region'],
+            'pollutant_name': closest_start['pollutant_name'],
+            'pollutant_units': closest_start['pollutant_units'],
+            'value': closest_start['value'],
+            'datetime_from': closest_start['datetime_from'],
+            'datetime_to': closest_end['datetime_to'],
+            'reduction': closest_start['value'] - closest_end['value']
+        }])
 
-    return df_grouped
+    return df.groupby(['town', 'pollutant_name']).apply(find_closest_dates, start_date=start_date, end_date=end_date).reset_index(drop=True)
