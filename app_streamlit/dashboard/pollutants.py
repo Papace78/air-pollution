@@ -26,13 +26,13 @@ pollutants_info = {
         "code": "no2",
     },
     "🌫️ Particulate Matter (PM₁₀)": {
-        "sources": "Diesel engines, burning wood and coal, dust from farming and wildfires.",
+        "sources": "Particulate less than 10 microns in diameter. Diesel engines, burning wood and coal, dust from farming and wildfires.",
         "health_effects": "Irritates lungs, increases risk of heart disease and respiratory issues.",
         "environmental_impact": "Damages buildings and affects climate.",
         "code": "pm10",
     },
     "🌫️ Fine Particulate Matter (PM₂.₅)": {
-        "sources": "Vehicle emissions, industrial burning, wildfires.",
+        "sources": "Particulate less than 2.5 microns in diameter. Vehicle emissions, industrial burning, wildfires.",
         "health_effects": "Deeply penetrates lungs, linked to heart disease and lung cancer.",
         "environmental_impact": "Affects cloud formation and climate patterns.",
         "code": "pm25",

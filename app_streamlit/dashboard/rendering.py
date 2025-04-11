@@ -1,8 +1,10 @@
 """Join data transformation and plots to render the graphs on dashboard."""
 
 import pandas as pd
+import streamlit as st
 
 from data_transformation import (
+    build_seasons_df,
     prepare_time_series_data,
     PollutionLevel,
     PollutionSensors,
@@ -13,28 +15,40 @@ from plots import (
     bar_plot_average_variation,
     bar_plot_ranking_sensors,
     plot_time_series,
+    pie_plot_seasons,
 )
 
 def render_pollution_trend_tab(
     measurements: pd.DataFrame,
-    location: str,
+    location: list[str],
     loc_filter: str,
     pollutants: list[str],
-    compare_location: str = "None",
 ):
+    selected_location = location[0]
+    compare_locations = location[1:]
     df_filtered, df_compare = prepare_time_series_data(
         measurements=measurements,
-        selected_location=location,
+        selected_location=selected_location,
         location_filter_by=loc_filter,
         pollutants=pollutants,
-        compare_location=compare_location,
+        compare_locations=compare_locations,
     )
+    if df_filtered.empty and df_compare.empty:
+        st.markdown("*No data for selected pollutants and locations.*")
+        return None
     plot_time_series(
         df_filtered,
         df_compare,
-        selected_location=location,
-        compare_location=compare_location,
+        location_filter_by = loc_filter,
+        selected_location=selected_location,
+        compare_locations=compare_locations,
     )
+    with st.expander(label="Is the data cyclical ?"):
+        seasons_df = build_seasons_df(
+            measurements,
+            pollutants,
+        )
+        pie_plot_seasons(seasons_df)
 
 
 def render_pollution_levels_tab(

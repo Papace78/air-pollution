@@ -8,8 +8,8 @@ from data_generation import (
     get_measurements_daterange_data,
     get_locations,
 )
-from data_transformation import transforms_measures_to_reduction, build_seasons_df
-from plots import generate_heatmap, pie_plot_seasons
+from data_transformation import transforms_measures_to_reduction
+from plots import generate_heatmap
 from pollutants import pollutants_info
 from rendering import (
     render_pollution_change_tab,
@@ -35,23 +35,29 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-left_co, cent_co, last_co = st.columns([1, 1, 1])
+left_co, cent_co, last_co = st.columns([0.9, 1, 1])
 with cent_co:
     st.image(
         "https://hlassets.paessler.com/common/files/graphics/iot/sub-visual_iot-monitoring_air-quality-monitoring-v1.png",
         use_container_width=True,
     )
+
 st.markdown(
     """
     <style>
         .skip-space {
-            height: 10vh;  /* Skip one full screen height */
+            height: 9vh;  /* Skip one full screen height */
         }
     </style>
     """,
     unsafe_allow_html=True,
 )
 st.markdown('<div class="skip-space"></div>', unsafe_allow_html=True)
+
+left_co, cent_co, last_co = st.columns([1.8, 1, 1])
+with cent_co:
+    st.markdown("&#8595;", unsafe_allow_html=True)
+
 st.markdown("___", unsafe_allow_html=True)
 
 
@@ -65,12 +71,14 @@ if "go2" not in st.session_state:
 # Title
 left_co, cent_co, last_co = st.columns([0.9, 1, 0.9])
 with cent_co:
-    st.title("🌿 Air Quality Dashboard")
+    st.title("🌿 France Air Quality")
+    col1, col2 = st.columns([0.3, 1])
+    with col2:
+        st.caption("Data collected from OpenAQ API")
 
-
+st.markdown("\n")
 # ------ FIRST SET OF FILTERS SELECTION ---------------
 # Filters for pollutants and for date
-
 st.markdown("## 🔬 Select one or more pollutants")
 
 col1, col2, col3 = st.columns([1, 1, 1])
@@ -85,12 +93,12 @@ def create_expandable_tile_with_checkbox(pollutant_name, pollutant_details, key)
     col1, col2 = st.columns([1, 15])
     with col1:
         selected = st.checkbox(
-            pollutant_name, key=f"checkbox_{key}", label_visibility="collapsed"
-        )  # Checkbox for selection
+            pollutant_name,
+            key=f"checkbox_{key}",
+            label_visibility="collapsed",
+        )
     with col2:
-        with st.expander(
-            pollutant_name, expanded=False
-        ):  # Expandable section for details
+        with st.expander(pollutant_name, expanded=False):
             st.markdown(f"### {pollutant_name}")
             st.write(f"**Sources:** {pollutant_details['sources']}")
             st.write(f"**Health Effects:** {pollutant_details['health_effects']}")
@@ -139,6 +147,12 @@ with col3:
         "🌋 Sulfur Dioxide (SO₂)", pollutants_info["🌋 Sulfur Dioxide (SO₂)"], key="so2"
     ):
         selected_pollutants.append("🌋 Sulfur Dioxide (SO₂)")
+    st.markdown("")
+    st.markdown("")
+    st.markdown("")
+    st.markdown("")
+    st.markdown("")
+    st.markdown("", help="PM 2.5 is a good overall indicator of air quality.")
 
 min_date = datetime.strptime("2017-01-01", "%Y-%m-%d").date()
 max_date = datetime.strptime("2025-04-01", "%Y-%m-%d").date()
@@ -147,7 +161,7 @@ month_range = pd.date_range(start=min_date, end=max_date, freq="MS")  # MS = Mon
 
 # Use select_slider for month selection
 start_date, end_date = st.select_slider(
-    "Select date range by month:",
+    "Select date range:",
     options=month_range,
     value=(month_range[0], month_range[-1]),
     format_func=lambda x: x.strftime("%B %Y"),
@@ -172,7 +186,6 @@ if st.button("Go", key=1):
 if st.session_state.get("go1", False):
     st.markdown(f"`{', '.join(selected_pollutants)}`\n\n")
 
-# ------ SECOND SET OF (LOCAL) FILTERS ---------------
 if go1_clicked:
     selected_pollutants = st.session_state.selected_pollutants
     start_date_str = st.session_state.start_date_str
@@ -214,7 +227,6 @@ if go1_clicked:
             st.session_state.df_grouped = df_grouped
             st.session_state.pollutants_code = pollutants_code
 
-# ------ AFTER SECOND SET OF FILTERS SELECTED ---------------
 if st.session_state.get("go1", False) and "df_grouped" in st.session_state:
     selected_pollutants = st.session_state.selected_pollutants
     start_date_str = st.session_state.start_date_str
@@ -234,10 +246,11 @@ if st.session_state.get("go1", False) and "df_grouped" in st.session_state:
         with tab2:
             st.dataframe(df_grouped)
 
+    # ------ SECOND SET OF (LOCAL) FILTERS ---------------
     with col2:
         locations = get_locations()
         st.markdown("## 🏙️ Local")
-        col1, col2, col3 = st.columns([4, 4, 1])
+        col1, col2, col3 = st.columns([4, 5, 1])
         with col1:
             location_filter_by = st.radio(
                 "📌 Filter by location type",
@@ -247,33 +260,38 @@ if st.session_state.get("go1", False) and "df_grouped" in st.session_state:
             )
             location_options = sorted(locations[location_filter_by].dropna().unique())
         with col2:
-            selected_location = st.selectbox(
-                f"🏘️ Select a {location_filter_by}",
+            selected_location = st.multiselect(
+                f"🏘️ Select one or more {location_filter_by}s",
                 options=location_options,
                 key="location_select",
+                help=f"If not seeing selected {location_filter_by} in the graph == No data"
             )
         with col3:
             st.caption("")
             go2_clicked = False
+            # ------ AFTER SECOND SET OF FILTERS SELECTED ---------------
             if st.button("Go", key=2):
-                st.session_state.go2 = True
-                st.session_state.location_filter_by = location_filter_by
-                st.session_state.selected_location = selected_location
-                with st.spinner(""):
-                    try:
-                        st.session_state.measurements_df = (
-                            get_measurements_daterange_data(
-                                start_date_str,
-                                end_date_str,
+                if selected_location == []:
+                    st.write(f"Select {location_filter_by}")
+                else:
+                    st.session_state.go2 = True
+                    st.session_state.location_filter_by = location_filter_by
+                    st.session_state.selected_location = selected_location
+                    with st.spinner(""):
+                        try:
+                            st.session_state.measurements_df = (
+                                get_measurements_daterange_data(
+                                    start_date_str,
+                                    end_date_str,
+                                )
                             )
-                        )
-                        # Optionally, you can also store other relevant data from here, like `seasons_df`
-                    except Exception as e:
-                        st.markdown(
-                            "⚠️ Issue loading data. Try with a shorter time range."
-                        )
-                        st.error(f"❌ Error: {e}")
-                go2_clicked = True
+                            # Optionally, you can also store other relevant data from here, like `seasons_df`
+                        except Exception as e:
+                            st.markdown(
+                                "⚠️ Issue loading data. Try with a shorter time range."
+                            )
+                            st.error(f"❌ Error: {e}")
+                    go2_clicked = True
 
         if st.session_state.go1 and st.session_state.go2:
             location_filter_by = st.session_state.location_filter_by
@@ -293,12 +311,6 @@ if st.session_state.get("go1", False) and "df_grouped" in st.session_state:
                             )
                         with tab2:
                             measurements_df
-                        with st.expander(label="Is the data cyclical ?"):
-                            seasons_df = build_seasons_df(
-                                measurements_df,
-                                pollutants_code,
-                            )
-                            pie_plot_seasons(seasons_df)
                     except Exception as e:
                         st.markdown(
                             "⚠️ Issue loading data. Try with shorter time range or load again."
@@ -313,7 +325,7 @@ if st.session_state.get("go1", False) and "df_grouped" in st.session_state:
                                 measurements_df,
                                 location_filter_by,
                                 pollutants_code,
-                                [selected_location],
+                                selected_location,
                             )
                         with tab2:
                             measurements_df
@@ -337,7 +349,7 @@ if st.session_state.get("go1", False) and "df_grouped" in st.session_state:
                                 reduction_data,
                                 location_filter_by,
                                 pollutants_code,
-                                [selected_location],
+                                selected_location,
                             )
                         with tab2:
                             reduction_data
@@ -372,13 +384,13 @@ with st.expander("📊 Global Dataset Info"):
     col1, col2, col3, col4, col5 = st.columns(5)
 
     with col1:
-        st.metric(label="🔢 Total Records", value="104,167", delta=None)
+        st.metric(label="🔢 Total Records", value="109,447", delta=None)
     with col2:
         st.metric(label="🛰️ Sensors", value="2,401", delta=None)
     with col3:
-        st.metric(label="🏘️ Towns", value="199", delta=None)
+        st.metric(label="🏘️ Towns", value="210", delta=None)
     with col4:
-        st.metric(label="🏙️ Departments", value="96", delta=None)
+        st.metric(label="🏙️ Departments", value="99", delta=None)
     with col5:
         st.metric(label="🗺️ Regions", value="17", delta=None)
 
