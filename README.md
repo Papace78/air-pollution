@@ -1,7 +1,7 @@
 # 🌍 Air Pollution Dashboard
 
 ## 🚀 Overview
-Visualize air pollution data (PM2.5, PM10, NO2, etc.) from **French towns** through an interactive [dashboard](air-pg.streamlit.app).
+Visualize air pollution data (PM2.5, PM10, NO2, etc.) from **French towns** through an interactive [dashboard](https://air-pg.streamlit.app).
 
 ### 🔑 Key Features:
 - **Data Exploration**: Easily filter pollution data by **pollutant**, **date range**, and **geographical location** (town, department, region).
