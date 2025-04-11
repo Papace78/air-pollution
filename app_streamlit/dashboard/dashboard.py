@@ -18,40 +18,24 @@ from rendering import (
     render_sensors_tab,
 )
 
+st.set_page_config(page_title="Air Quality Dashboard",
+                   page_icon="bar_chart:",
+                   layout="wide")
 
 st.markdown(
     """
     <style>
-        /* Layout tweaks */
         .block-container {
-            padding: 10px;
-            margin: 10px;
-            max-width: 100%;
+            padding: 10;   /* Remove internal padding to use full screen */
+            margin: 10;    /* Remove any margin around the content */
+            max-width: 100%; /* Use the full width available */
         }
         .main {
-            width: 100%;
-        }
-
-        /* Theme colors */
-        body {
-            background-color: #00172B;
-            color: #FFFFFF;
-        }
-        .stApp {
-            background-color: #00172B;
-        }
-        .css-18ni7ap {  /* sidebar background */
-            background-color: #0083B8 !important;
-        }
-        .css-1cpxqw2 {  /* button color etc */
-            color: #20b2aa;
-        }
-        h1, h2, h3, h4, h5, h6 {
-            color: #FFFFFF;
+            width: 100%;  /* Make sure content uses the entire screen width */
         }
     </style>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 
