@@ -346,8 +346,11 @@ def prepare_time_series_data(
     selected_location: str,
     location_filter_by: str,
     pollutants: list[str],
-    compare_location: str = "None",
+    compare_locations: list[str] = None,  # Now accepts a list of locations
 ):
+    if compare_locations is None:
+        compare_locations = ["None"]  # Default to a list containing "None" if no locations provided
+
     # Filter to keep only selected pollutants
     df = measurements[measurements["pollutant_name"].isin(pollutants)]
 
@@ -358,9 +361,16 @@ def prepare_time_series_data(
         .reset_index()
     )
 
-    # Split data
+    # Filter data for the selected location
     df_filtered = df_grouped[df_grouped[location_filter_by] == selected_location]
-    df_compare = df_grouped[df_grouped[location_filter_by] == compare_location]
+
+    # Create an empty DataFrame to collect data from all compare locations
+    df_compare = pd.DataFrame()
+
+    # Loop through each compare location and filter data for it
+    for compare_location in compare_locations:
+        df_location = df_grouped[df_grouped[location_filter_by] == compare_location]
+        df_compare = pd.concat([df_compare, df_location])
 
     # Compute Q25 / Q75
     quantiles = (
@@ -370,7 +380,7 @@ def prepare_time_series_data(
     )
     quantiles.columns = ["Q25", "Q75"]
 
-    # Merge quantiles with main df
+    # Merge quantiles with the filtered df
     df_filtered = df_filtered.merge(
         quantiles,
         left_on=["datetime_to", "pollutant_name"],
@@ -379,6 +389,7 @@ def prepare_time_series_data(
     )
 
     return df_filtered, df_compare
+
 
 
 def build_seasons_df(

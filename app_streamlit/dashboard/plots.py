@@ -109,7 +109,7 @@ def bar_plot_average_concentration(
         x=f"{location_filter_by}",
         y="value",
         color="pollutant_name",
-        title=f"{location_filter_by.capitalize()}s with Highest Average Pollutant Values",
+        title=f"Highest Average Concentration Across Selected Date Range",
         labels={
             "value": "Average Value",
             f"{location_filter_by}": f"{location_filter_by} - Pollutant",
@@ -164,9 +164,7 @@ def bar_plot_average_variation(
         .reset_index(name="hover_text")
     )
 
-    plot_df = (
-        df.groupby(location_filter_by)["total_reduction"].max().reset_index()
-    )
+    plot_df = df.groupby(location_filter_by)["total_reduction"].max().reset_index()
 
     plot_df = plot_df.merge(avg_hover_data, on=location_filter_by)
     plot_df["sort_order"] = plot_df[location_filter_by].apply(
@@ -195,7 +193,7 @@ def bar_plot_average_variation(
     )
 
     fig.update_layout(
-        title=f"{location_filter_by.title()} with Largest Pollutant Variation",
+        title=f"Largest Pollutant Variation Across Selected Date Range",
         xaxis_title=None,
         yaxis_title="Total Reduction (µg/m³)",
     )
@@ -206,9 +204,13 @@ def bar_plot_average_variation(
 def plot_time_series(
     df_filtered: pd.DataFrame,
     df_compare: pd.DataFrame,
+    location_filter_by: str,
     selected_location: str,
-    compare_location: str = "None",
+    compare_locations: list[str] = None,  # Accepts a list of compare locations
 ):
+    if compare_locations is None:
+        compare_locations = ["None"]  # Default to an empty list if None provided
+
     fig = px.line(
         df_filtered,
         x="datetime_to",
@@ -222,6 +224,8 @@ def plot_time_series(
         },
         markers=True,
     )
+    for trace in fig.data:
+        trace.name = f"{trace.name} ({selected_location})"
 
     fig.update_layout(
         xaxis=dict(title=""),
@@ -238,30 +242,36 @@ def plot_time_series(
         showticklabels=True,
     )
 
-    if compare_location != "None" and not df_compare.empty:
-        fig.update_layout(
-            title={
-                "text": f"Pollutant Concentration Over Time - {selected_location} vs {compare_location}"
-            }
-        )
-        for poll in df_compare["pollutant_name"].unique():
-            poll_data = df_compare[df_compare["pollutant_name"] == poll]
-            fig.add_trace(
-                go.Scatter(
-                    x=poll_data["datetime_to"],
-                    y=poll_data["average"],
-                    mode="lines",
-                    line=dict(dash="dot", width=1),
-                    name=f"{poll} ({compare_location})",
-                    opacity=0.8,
+    # If there are compare locations, add them to the plot
+    if "None" not in compare_locations and not df_compare.empty:
+        fig.update_layout(title={"text": "Pollutant Level Over Time"})
+
+        for compare_location in compare_locations:
+            for poll in df_compare["pollutant_name"].unique():
+                poll_data = df_compare[
+                    df_compare[location_filter_by] == compare_location
+                ]
+                poll_data = poll_data[poll_data["pollutant_name"] == poll]
+
+                fig.add_trace(
+                    go.Scatter(
+                        x=poll_data["datetime_to"],
+                        y=poll_data["average"],
+                        mode="lines",
+                        line=dict(dash="solid", width=0.8),
+                        name=f"{poll} ({compare_location})",
+                        opacity=0.8,
+                        showlegend=True
+                    )
                 )
-            )
     else:
+        # Plot the Q25–Q75 range for the selected location if no compare locations are specified
         fig.update_layout(
             title={
-                "text": f"Pollutant Concentration Over Time - {selected_location} <br><span style='font-size:10px;'>with Q25–Q75 range</span>"
+                "text": f"Pollutant Level Over Time <br><span style='font-size:12px;'>with Q25–Q75 range</span>"
             }
         )
+
         for poll in df_filtered["pollutant_name"].unique():
             poll_data = df_filtered[df_filtered["pollutant_name"] == poll]
 
@@ -296,7 +306,7 @@ def pie_plot_seasons(df: pd.DataFrame):
     fig = px.pie(
         df,
         names="season",
-        title = "Seasonal average concentrations",
+        title="Seasonal Distribution of Pollutants",
         values="value",
         labels={"value": "Mean concentration (µg/m³)"},
     )

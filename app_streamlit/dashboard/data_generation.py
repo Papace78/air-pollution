@@ -70,7 +70,7 @@ def get_measurements_daterange_data(
     ).execute()
     df = pd.DataFrame(response.data)
     df = df[df["department"] != "Not_found"]
-    df = df[df["region"] != "Île-de-france"]
+    df['region'] = df['region'].replace("Île-de-france", "Île-de-France")
     return df
 
 
