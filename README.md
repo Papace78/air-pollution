@@ -3,27 +3,24 @@
 ## 🚀 Overview
 Visualize air pollution data (PM2.5, PM10, NO2, etc.) from **French towns** through an interactive [dashboard](https://air-pg.streamlit.app).
 
-### 🔑 Key Features:
-- **Data Exploration**: Easily filter pollution data by **pollutant**, **date range**, and **geographical location** (town, department, region).
-- **Pollution Peaks**: Discover **pollution trends** and identify when pollution levels are at their highest.
-- **Air Quality Improvements**: Track and identify localities with the **most significant improvements** in air quality.
-- **Sensor Analysis**: Find out which localities have the **most sensors** measuring pollution per pollutant.
-- **Interactive Dashboard**: Users can explore visual data and uncover insights about air pollution trends in real-time.
+### 🎯 **Key Competencies**
 
-### 🎯 Personal Objectives
+**💻 Data Collection & ETL Pipeline (API → PostgreSQL)**:
+- 🌐 Collecting data via API requests.
+- 🧹 Data cleaning and transformation.
+- 🗄️ Creation, insertion, and hosting of a PostgreSQL database.
 
-#### 1. **Data Collection & Processing (ETL)**
-   - Fetch data from the **OpenAQ API**.
-   - Clean, transform, and store data in a **PostgreSQL** database.
-   - **Host the database on the cloud** to ensure constant availability.
+
+**📊 Data Querying & Visualization (PostgreSQL → Interactive Dashboard)**:
+- 🔎 Querying and retrieving data from the PostgreSQL database.
+- 🔄 Data transformation and aggregation.
+- 📈 Creation of interactive visualizations in a web dashboard.
+
+
 
    <img src="image/db_schema.png" alt="postgreSQL database" width="400"/>
 
    **Database Schema**
-
-#### 2. **Data Visualization & Dashboard Creation**
-   - Query the stored data for meaningful insights.
-   - Use **Plotly** and **Streamlit** to build a **user-friendly** and **interactive dashboard**.
 
    **Example of initial filters:**
    ![Filtering Example 1](image/filtering_example.png)
@@ -31,7 +28,16 @@ Visualize air pollution data (PM2.5, PM10, NO2, etc.) from **French towns** thro
    **Example of applied filters with graph:**
    ![Filtering Example 2](image/filtering_example_two.png)
 
+### 🔑 Key Features:
+- **Data Exploration**: Easily filter pollution data by **pollutant**, **date range**, and **geographical location** (town, department, region).
+- **Pollution Peaks**: Discover **pollution trends** and identify when pollution levels are at their highest.
+- **Air Quality Improvements**: Track and identify localities with the **most significant improvements** in air quality.
+- **Sensor Analysis**: Find out which localities have the **most sensors** measuring pollution per pollutant.
+- **Interactive Dashboard**: Users can explore visual data and uncover insights about air pollution trends in real-time.
+
+
 ---
+
 
 ## 🗂️ Data
 
