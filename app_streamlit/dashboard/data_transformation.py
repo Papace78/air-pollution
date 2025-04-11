@@ -422,9 +422,9 @@ def transforms_measures_to_reduction(df, start_date, end_date):
     df['datetime_to'] = pd.to_datetime(df['datetime_to'])
 
     # Define your start and end date
-    start_date = pd.to_datetime('2023-04-01')
-    end_date = pd.to_datetime('2025-04-01')
-# Find the closest datetime_from and datetime_to for each town and pollutant
+    start_date = pd.to_datetime(start_date)
+    end_date = pd.to_datetime(end_date)
+    # Find the closest datetime_from and datetime_to for each town and pollutant
     def find_closest_dates(group, start_date, end_date):
         closest_start = group.iloc[(group['datetime_from'] - start_date).abs().argmin()]
         closest_end = group.iloc[(group['datetime_to'] - end_date).abs().argmin()]
