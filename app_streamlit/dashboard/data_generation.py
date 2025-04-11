@@ -2,12 +2,13 @@
 
 from supabase import create_client, Client
 import pandas as pd
+import streamlit as st
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
 
 # --- Supabase config ---
 url = "https://dluhqrwmercbvgfhoxef.supabase.co"
-key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsdWhxcndtZXJjYnZnZmhveGVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM3NTc5ODUsImV4cCI6MjA1OTMzMzk4NX0._R5TinJKV42TU0pFn0ZhJnzDjqshX4NZesVl9O8KC9o"
+key = st.secrets["SUPABASE_KEY"]
 
 supabase: Client = create_client(url, key)
 
