@@ -34,6 +34,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
 left_co, cent_co, last_co = st.columns([1, 1, 1])
 with cent_co:
     st.image(
@@ -62,7 +63,7 @@ if "go2" not in st.session_state:
 
 
 # Title
-left_co, cent_co, last_co = st.columns([0.9,1,0.9])
+left_co, cent_co, last_co = st.columns([0.9, 1, 0.9])
 with cent_co:
     st.title("🌿 Air Quality Dashboard")
 
@@ -142,14 +143,16 @@ with col3:
 min_date = datetime.strptime("2017-01-01", "%Y-%m-%d").date()
 max_date = datetime.strptime("2025-04-01", "%Y-%m-%d").date()
 
-start_date, end_date = st.slider(
-    "Select date range:",
-    min_value=min_date,
-    max_value=max_date,
-    value=(min_date, max_date),
-    format="YYYY-MM-DD",
-    label_visibility="visible",
+month_range = pd.date_range(start=min_date, end=max_date, freq="MS")  # MS = Month Start
+
+# Use select_slider for month selection
+start_date, end_date = st.select_slider(
+    "Select date range by month:",
+    options=month_range,
+    value=(month_range[0], month_range[-1]),
+    format_func=lambda x: x.strftime("%B %Y"),
 )
+
 start_date_str = pd.to_datetime(start_date).replace(day=1).strftime("%Y-%m-%d")
 end_date_str = pd.to_datetime(end_date).replace(day=1).strftime("%Y-%m-%d")
 
@@ -223,7 +226,7 @@ if st.session_state.get("go1", False) and "df_grouped" in st.session_state:
     with col1:
         st.markdown("## 🗺️ National")
         st.caption(
-            f"Displaying locations that have records for all selected pollutants at 🕒`{end_date_str}`"
+            f"📍 Showing only locations with records for **all selected pollutants** as of 🕒`{end_date_str}`"
         )
         tab1, tab2 = st.tabs(["🗺️ Map", "📋 Table"])
         with tab1:
@@ -364,8 +367,92 @@ if st.session_state.get("go1", False) and "df_grouped" in st.session_state:
 
 
 st.markdown("---")
-with st.expander(label="going further"):
-    st.markdown("hallo")
+
+with st.expander("📊 Global Dataset Info"):
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    with col1:
+        st.metric(label="🔢 Total Records", value="104,167", delta=None)
+    with col2:
+        st.metric(label="🛰️ Sensors", value="2,401", delta=None)
+    with col3:
+        st.metric(label="🏘️ Towns", value="199", delta=None)
+    with col4:
+        st.metric(label="🏙️ Departments", value="96", delta=None)
+    with col5:
+        st.metric(label="🗺️ Regions", value="17", delta=None)
+
+col1, col2 = st.columns(2)
+with col1:
+    with st.expander("ℹ️ About"):
+        st.markdown(
+            """
+    ---
+    🌿 **Project Purpose**:  \n\n
+    - An interactive exploration of **France air quality data**.
+    Monitor pollution levels, understand pollutants' effects, and gain insights into environmental quality. of different regions.
+
+
+    ⚠️ **Data Quality & Limitations**:  \n\n
+    - Data quality can vary due to sensor malfunctions, gaps, or delays. Some sensors may turn on/off, affecting consistency.
+
+
+    🛠️ **How to Use**:  \n\n
+    - Explore the dashboard by selecting different pollutants and adjusting the date range to analyze trends over time. Focus on geographical comparisons to identify areas with the highest pollution levels.
+
+
+    ⚖️ **Important Disclaimer on Pollutant Comparisons**:  \n\n
+    - Pollutants **cannot be directly compared**. They have different typical concentration levels (e.g., O₃ vs. NO₂). When selecting multiple pollutants, the algorithm sums their concentrations, which could misrepresent the impact.
+    Always consider the nature and typical concentrations of each pollutant when interpreting the data.
+
+
+    🌐 **Data Source**:  \n\n
+    - Data comes from **[OpenAQ API](https://openaq.org/)**, providing global air quality data in **µg/m³** (physical units, not AQI).
+
+    🙏 **Acknowledgments**:  \n\n
+    Thanks to **open-source contributors** for powering this project, including:
+    - **OpenAQ** (for air quality data)
+    - **Streamlit** (for the interactive framework)
+    - **Pandas & NumPy** (for data manipulation)
+    - **Plotly** (for visualization)
+    - **Supabase** (for hosting the database)
+
+    ---
+
+    [Project Github](https://github.com/Papace78/air-pollution)\n
+    Coded by Pascal Ghaname
+    """
+        )
+
+with col2:
+    with st.expander("🛠️ Future Work"):
+        st.markdown(
+            """
+    ---
+    **🔄 Automate the ETL Pipeline**:
+    - Fully automate the extraction, cleaning, and loading of data to ensure continuous updates.
+
+    **🧮 Air Quality Index**:
+    - Compute a global AQI by weighing pollutant contributions.
+
+    **🎨 Visual thresholds**:
+    - Color code pollutants from unhealthy to healthy ranges.
+
+    **🌦️ Weather correlations**:
+    - Analyze how pollution relates to temperature, pressure, and wind.
+
+    **🏥 Health impact**:
+    - Explore links between pollutant levels and disease rates.
+
+    **🏙️ Urban policy impact**:
+    - Assess effects of political measures (e.g., city pedestrianization).
+
+    **📊 More data**:
+    - Collect additional data and perform deeper cleaning.
+
+    ---
+        """
+        )
 
 # --- Hide Streamlit Default Styling ---
 hide_st_style = """
