@@ -6,6 +6,7 @@ import streamlit as st
 from data_transformation import (
     build_seasons_df,
     prepare_time_series_data,
+    prepare_time_stats_data,
     PollutionLevel,
     PollutionSensors,
     PollutionVariation,
@@ -17,6 +18,7 @@ from plots import (
     plot_time_series,
     pie_plot_seasons,
 )
+
 
 def render_pollution_trend_tab(
     measurements: pd.DataFrame,
@@ -39,11 +41,20 @@ def render_pollution_trend_tab(
     plot_time_series(
         df_filtered,
         df_compare,
-        location_filter_by = loc_filter,
+        location_filter_by=loc_filter,
         selected_location=selected_location,
         compare_locations=compare_locations,
     )
-    with st.expander(label="Is the data cyclical ?"):
+    with st.expander(label="Summary Statistics", expanded=True):
+        df_concat = pd.concat(
+            [df_filtered.drop(columns=["Q25", "Q75"]), df_compare],
+            axis=0,
+            ignore_index=True,
+        )
+        st.dataframe(prepare_time_stats_data(df_concat, loc_filter, location))
+        st.markdown("_All values are expressed in µg/m³ (micrograms per cubic meter)._")
+
+    with st.expander(label="Is the pollution seasonal ?"):
         seasons_df = build_seasons_df(
             measurements,
             pollutants,

@@ -165,9 +165,9 @@ class PollutionVariation:
             & (df["pollutant_name"].isin(pollutants))
         ]
 
-        grouped_ref = ref_df.groupby([location_filter_by, "pollutant_name"], as_index=False)[
-            "reduction"
-        ].mean()
+        grouped_ref = ref_df.groupby(
+            [location_filter_by, "pollutant_name"], as_index=False
+        )["reduction"].mean()
         return grouped_ref
 
     @staticmethod
@@ -349,7 +349,9 @@ def prepare_time_series_data(
     compare_locations: list[str] = None,  # Now accepts a list of locations
 ):
     if compare_locations is None:
-        compare_locations = ["None"]  # Default to a list containing "None" if no locations provided
+        compare_locations = [
+            "None"
+        ]  # Default to a list containing "None" if no locations provided
 
     # Filter to keep only selected pollutants
     df = measurements[measurements["pollutant_name"].isin(pollutants)]
@@ -391,6 +393,29 @@ def prepare_time_series_data(
     return df_filtered, df_compare
 
 
+def prepare_time_stats_data(
+    df_concat: pd.DataFrame,
+    loc_filter: str,
+    location: list[str],
+) -> pd.DataFrame:
+
+    df_concat[f"{loc_filter}"] = pd.Categorical(
+        df_concat[f"{loc_filter}"], categories=location, ordered=True
+    )
+
+    summary = (
+        df_concat.groupby([f"{loc_filter}", "pollutant_name"])["average"]
+        .agg(average="mean", median="median", max="max", min="min")
+        .reset_index()
+    )
+    summary = summary.rename(columns = {'pollutant_name': 'pollutant'})
+
+    # Sort by the new categorical order
+    summary = summary.sort_values(["pollutant",f"{loc_filter}"]).set_index(
+        ["pollutant", f"{loc_filter}"]
+    )
+    return summary.round(2)
+
 
 def build_seasons_df(
     df: pd.DataFrame,
@@ -429,27 +454,36 @@ def build_seasons_df(
 
 
 def transforms_measures_to_reduction(df, start_date, end_date):
-    df['datetime_from'] = pd.to_datetime(df['datetime_from'])
-    df['datetime_to'] = pd.to_datetime(df['datetime_to'])
+    df["datetime_from"] = pd.to_datetime(df["datetime_from"])
+    df["datetime_to"] = pd.to_datetime(df["datetime_to"])
 
     # Define your start and end date
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
+
     # Find the closest datetime_from and datetime_to for each town and pollutant
     def find_closest_dates(group, start_date, end_date):
-        closest_start = group.iloc[(group['datetime_from'] - start_date).abs().argmin()]
-        closest_end = group.iloc[(group['datetime_to'] - end_date).abs().argmin()]
+        closest_start = group.iloc[(group["datetime_from"] - start_date).abs().argmin()]
+        closest_end = group.iloc[(group["datetime_to"] - end_date).abs().argmin()]
 
-        return pd.DataFrame([{
-            'town': closest_start['town'],
-            'department': closest_start['department'],
-            'region': closest_start['region'],
-            'pollutant_name': closest_start['pollutant_name'],
-            'pollutant_units': closest_start['pollutant_units'],
-            'value': closest_start['value'],
-            'datetime_from': closest_start['datetime_from'],
-            'datetime_to': closest_end['datetime_to'],
-            'reduction': closest_start['value'] - closest_end['value']
-        }])
+        return pd.DataFrame(
+            [
+                {
+                    "town": closest_start["town"],
+                    "department": closest_start["department"],
+                    "region": closest_start["region"],
+                    "pollutant_name": closest_start["pollutant_name"],
+                    "pollutant_units": closest_start["pollutant_units"],
+                    "value": closest_start["value"],
+                    "datetime_from": closest_start["datetime_from"],
+                    "datetime_to": closest_end["datetime_to"],
+                    "reduction": closest_start["value"] - closest_end["value"],
+                }
+            ]
+        )
 
-    return df.groupby(['town', 'pollutant_name']).apply(find_closest_dates, start_date=start_date, end_date=end_date).reset_index(drop=True)
+    return (
+        df.groupby(["town", "pollutant_name"])
+        .apply(find_closest_dates, start_date=start_date, end_date=end_date)
+        .reset_index(drop=True)
+    )

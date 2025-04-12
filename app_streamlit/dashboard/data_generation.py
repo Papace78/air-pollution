@@ -1,14 +1,18 @@
 """Import data from postgreSQL database that is hosted on supabase."""
 
+import os
+
 from supabase import create_client, Client
 import pandas as pd
 import streamlit as st
 from tenacity import retry, stop_after_attempt, wait_random_exponential
+from dotenv import load_dotenv
 
+load_dotenv()
 
 # --- Supabase config ---
 url = "https://dluhqrwmercbvgfhoxef.supabase.co"
-key = st.secrets["SUPABASE_KEY"]
+key = os.getenv("SUPABASE_KEY")
 
 supabase: Client = create_client(url, key)
 
