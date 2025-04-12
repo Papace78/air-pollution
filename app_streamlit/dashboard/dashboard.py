@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from PIL import Image
 
 from data_generation import (
     get_all_measures,
@@ -18,9 +19,9 @@ from rendering import (
     render_sensors_tab,
 )
 
-st.set_page_config(page_title="Air Quality Dashboard",
-                   page_icon="bar_chart:",
-                   layout="wide")
+st.set_page_config(
+    page_title="Air Quality Dashboard", page_icon="bar_chart:", layout="wide"
+)
 
 st.markdown(
     """
@@ -39,24 +40,8 @@ st.markdown(
 )
 
 
-left_co, cent_co, last_co = st.columns([0.9, 1, 1])
-with cent_co:
-    st.image(
-        "https://hlassets.paessler.com/common/files/graphics/iot/sub-visual_iot-monitoring_air-quality-monitoring-v1.png",
-        use_container_width=True,
-    )
-
-st.markdown(
-    """
-    <style>
-        .skip-space {
-            height: 9vh;  /* Skip one full screen height */
-        }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-st.markdown('<div class="skip-space"></div>', unsafe_allow_html=True)
+image = Image.open("dashboard/earth_void.png")
+st.image(image, use_container_width=True)
 
 left_co, cent_co, last_co = st.columns([1.8, 1, 1])
 with cent_co:
@@ -73,14 +58,18 @@ if "go2" not in st.session_state:
 
 
 # Title
-left_co, cent_co, last_co = st.columns([0.9, 1, 0.9])
+left_co, cent_co, last_co = st.columns([1.1, 1, 0.9])
 with cent_co:
-    st.title("🌿 France Air Quality")
-    col1, col2 = st.columns([0.3, 1])
+    st.title("France Air Quality")
+    col1, col2 = st.columns([0.17, 1])
     with col2:
         st.caption("Data collected from OpenAQ API")
 
 st.markdown("\n")
+st.markdown(">*Explore the dashboard by selecting different pollutants and\
+    adjusting the date range to analyze trends over time.\
+    Focus on geographical comparisons to identify areas with the\
+    highest pollution levels.*")
 # ------ FIRST SET OF FILTERS SELECTION ---------------
 # Filters for pollutants and for date
 st.markdown("## 🔬 Select one or more pollutants")
@@ -171,8 +160,6 @@ start_date, end_date = st.select_slider(
     format_func=lambda x: x.strftime("%B %Y"),
 )
 
-start_date_str = pd.to_datetime(start_date).replace(day=1).strftime("%Y-%m-%d")
-end_date_str = pd.to_datetime(end_date).replace(day=1).strftime("%Y-%m-%d")
 
 
 # 🔹 Track Go1 button click
@@ -183,8 +170,8 @@ if st.button("Go", key=1):
     st.session_state.go1 = True
     st.session_state.go2 = False
     st.session_state.selected_pollutants = selected_pollutants
-    st.session_state.start_date_str = start_date_str
-    st.session_state.end_date_str = end_date_str
+    st.session_state.start_date_str = pd.to_datetime(start_date).replace(day=1).strftime("%Y-%m-%d")
+    st.session_state.end_date_str = pd.to_datetime(end_date).replace(day=1).strftime("%Y-%m-%d")
     go1_clicked = True
 
 if st.session_state.get("go1", False):
@@ -268,7 +255,7 @@ if st.session_state.get("go1", False) and "df_grouped" in st.session_state:
                 f"🏘️ Select one or more {location_filter_by}s",
                 options=location_options,
                 key="location_select",
-                help=f"If not seeing selected {location_filter_by} in the graph == No data"
+                help=f"If not seeing selected {location_filter_by} in the graph == No data",
             )
         with col3:
             st.caption("")
@@ -411,10 +398,6 @@ with col1:
 
     ⚠️ **Data Quality & Limitations**:  \n\n
     - Data quality can vary due to sensor malfunctions, gaps, or delays. Some sensors may turn on/off, affecting consistency.
-
-
-    🛠️ **How to Use**:  \n\n
-    - Explore the dashboard by selecting different pollutants and adjusting the date range to analyze trends over time. Focus on geographical comparisons to identify areas with the highest pollution levels.
 
 
     ⚖️ **Important Disclaimer on Pollutant Comparisons**:  \n\n
