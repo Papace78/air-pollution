@@ -1,4 +1,5 @@
 # 🌍 Air Pollution Dashboard
+   ![Filtering Example 2](image/filtering_example_two.png)
 
 Visualize air pollution data (PM2.5, PM10, NO2, etc.) in France through an interactive [dashboard](https://air-pg.streamlit.app).
 
